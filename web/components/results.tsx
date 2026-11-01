@@ -114,15 +114,16 @@ function Items({ plan }: { plan: PlanView }) {
         ) : (
           <ul className="grid gap-2 sm:grid-cols-2">
             {plan.items.map((i) => (
-              <li key={`${i.label}|${i.source}`} className="flex items-center gap-3 rounded-lg border p-3 text-sm">
+              <li key={i.label} className="flex items-center gap-3 rounded-lg border p-3 text-sm">
                 <img src={i.image} alt="" loading="lazy" className="size-8 shrink-0 object-contain" />
                 <span className="flex-1">
                   <span className="font-medium">
                     {i.count}× {i.label}
                   </span>
                   <span className="block text-xs text-muted-foreground">
-                    {i.source}
-                    {i.price != null && ` · ${i.price} ${i.currency} each`}
+                    {i.sources
+                      .map((s) => `${s.count} ${s.source}${s.cost != null ? ` (${fmtNum(s.cost)} ${s.currency})` : ""}`)
+                      .join(" · ")}
                   </span>
                 </span>
               </li>

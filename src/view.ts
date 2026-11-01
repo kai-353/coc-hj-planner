@@ -59,7 +59,8 @@ export interface Timeline {
     /** Already running in the export (started before the plan). */
     running: boolean;
   }[];
-  boosts: { queue: PlanQueue; from: number; to: number; label: string }[];
+  /** Potion batches, drawn as a line at the moment they're drunk. */
+  boosts: { queue: PlanQueue; from: number; to: number; label: string; image: string; at: string; until: string }[];
   nights: { from: number; to: number }[];
   /** Local midnights inside the span, for the day axis. */
   days: { t: number; label: string }[];
@@ -90,13 +91,12 @@ export interface PlanView {
   }[];
   /** Builders and lab must be free by this time (null = no requirement). */
   freeBy: string | null;
+  /** One entry per magic item: total used, broken down by where it comes from. */
   items: {
     label: string;
     image: string;
-    source: string;
-    price: number | null;
-    currency: string | null;
     count: number;
+    sources: { source: string; count: number; cost: number | null; currency: string | null }[];
   }[];
   goblins: { name: string; upgrades: number; gems: number }[];
   spent: { currency: Currency; label: string; amount: number }[];
@@ -140,19 +140,25 @@ export function buildPlanView(plan: Plan): PlanView {
   const { clock, results, village, config } = plan;
 
   const items = new Map<string, PlanView["items"][number]>();
-  for (const a of plan.acquisitions) {
+  // Inventory first, then shops, so the breakdown reads "4 from inventory · 24 from League Shop".
+  const bySource = [...plan.acquisitions].sort((a, b) => Number(b.source === "owned") - Number(a.source === "owned"));
+  for (const a of bySource) {
     if (a.item === "goblin") continue;
-    const key = `${a.item}|${a.source}`;
-    const row = items.get(key) ?? {
-      label: ITEMS[a.item].label,
-      image: itemImage(a.item),
-      source: SOURCE_LABEL[a.source],
-      price: a.source === "owned" ? null : a.price,
-      currency: a.source === "owned" ? null : CURRENCY_LABEL[a.source],
-      count: 0,
-    };
+    const row = items.get(a.item) ?? { label: ITEMS[a.item].label, image: itemImage(a.item), count: 0, sources: [] };
     row.count++;
-    items.set(key, row);
+    let src = row.sources.find((s) => s.source === SOURCE_LABEL[a.source]);
+    if (!src) {
+      src = {
+        source: SOURCE_LABEL[a.source],
+        count: 0,
+        cost: a.source === "owned" ? null : 0,
+        currency: a.source === "owned" ? null : CURRENCY_LABEL[a.source],
+      };
+      row.sources.push(src);
+    }
+    src.count++;
+    if (src.cost != null) src.cost += a.price;
+    items.set(a.item, row);
   }
 
   let shortfall: PlanView["shortfall"] = null;
@@ -325,7 +331,15 @@ function buildTimeline(plan: Plan): Timeline {
       } else if (e.kind === "finish" && e.task.ongoing) {
         bar(e.slot, e.task, plan.start, e.t, e.task.ongoing.remainingMin, 0, true);
       } else if (e.kind === "potion") {
-        boosts.push({ queue: q, from: e.t, to: e.until, label: `${e.uses.length}× ${e.uses[0]!.label}` });
+        boosts.push({
+          queue: q,
+          from: e.t,
+          to: e.until,
+          label: `${e.uses.length}× ${e.uses[0]!.label}`,
+          image: itemImage(e.uses[0]!.item),
+          at: clock.dateTime(e.t),
+          until: clock.time(e.until),
+        });
       }
     }
 

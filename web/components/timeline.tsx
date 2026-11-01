@@ -86,29 +86,21 @@ export function TimelineChart({ timeline: tl, queues }: { timeline: Timeline; qu
               {/* Rows */}
               <div className="absolute inset-x-0" style={{ top: AXIS_H }}>
                 {groups.map((g) => (
-                  <Fragment key={g.queue}>
+                  <div key={g.queue} className="relative">
                     <div style={{ height: GROUP_H }} />
                     {g.rows.map((r) => (
                       <div key={r.id} className="relative" style={{ height: ROW_H }}>
-                        {tl.boosts
-                          .filter((b) => b.queue === g.queue)
-                          .map((b) => (
-                            <div
-                              key={b.from}
-                              className="absolute inset-y-0"
-                              style={{
-                                left: x(b.from),
-                                width: Math.max(2, x(b.to) - x(b.from)),
-                                background: "color-mix(in srgb, var(--viz-series-2) 18%, transparent)",
-                              }}
-                            />
-                          ))}
                         {(barsByRow.get(r.id) ?? []).map((b) => (
                           <Bar key={`${b.task.label}|${b.task.step}`} bar={b} left={x(b.start)} right={x(b.end)} />
                         ))}
                       </div>
                     ))}
-                  </Fragment>
+                    {tl.boosts
+                      .filter((b) => b.queue === g.queue)
+                      .map((b) => (
+                        <PotionMarker key={b.from} potion={b} x={x(b.from)} />
+                      ))}
+                  </div>
                 ))}
               </div>
             </div>
@@ -167,6 +159,36 @@ function Bar({ bar: b, left, right }: { bar: Timeline["bars"][number]; left: num
   );
 }
 
+/** A potion batch: a line across the queue's rows at the moment it's drunk, picture on top. */
+function PotionMarker({ potion: p, x }: { potion: Timeline["boosts"][number]; x: number }) {
+  return (
+    <>
+      <div
+        className="pointer-events-none absolute bottom-0 z-10 w-0.5 rounded-full"
+        style={{ left: x - 1, top: GROUP_H, background: "var(--viz-series-2)" }}
+      />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="absolute z-10 flex size-5 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            style={{ left: Math.max(0, x - 10), top: GROUP_H - 21 }}
+            aria-label={`Drink ${p.label} at ${p.at}, boost until ${p.until}`}
+          >
+            <img src={p.image} alt="" className="size-5 object-contain" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          <div className="font-semibold">Drink {p.label}</div>
+          <div className="opacity-80">
+            {p.at} · boost until {p.until}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </>
+  );
+}
+
 function Marker({ x, label }: { x: number; label: string }) {
   return (
     <>
@@ -190,7 +212,8 @@ function Legend() {
       <span className="flex items-center gap-1.5">{swatch("var(--viz-series-1)")}Upgrade</span>
       <span className="flex items-center gap-1.5">{swatch("var(--viz-running)")}Already running</span>
       <span className="flex items-center gap-1.5">
-        {swatch("color-mix(in srgb, var(--viz-series-2) 18%, transparent)")}Potion boost
+        <span className="inline-block h-3 w-0.5 rounded-full" style={{ background: "var(--viz-series-2)" }} aria-hidden />
+        Potion drunk
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-block h-3 w-5 rounded-[3px] ring-1 ring-border" style={{ background: "var(--viz-night)" }} aria-hidden />

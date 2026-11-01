@@ -3,6 +3,10 @@ import type { PlanView, ScheduleRow, TaskRef } from "./view";
 
 const fmtNum = (n: number) => n.toLocaleString("en-US");
 const taskName = (t: TaskRef) => `**${t.label}** ${t.step}`;
+export const sourcesText = (sources: PlanView["items"][number]["sources"]) =>
+  sources
+    .map((s) => `${s.count} ${s.source}${s.cost != null ? ` (${fmtNum(s.cost)} ${s.currency})` : ""}`)
+    .join(" · ");
 const spentText = (spent: PlanView["spent"]) => spent.map((s) => `${fmtNum(s.amount)} ${s.label}`).join(", ");
 
 function rowText(r: ScheduleRow): string {
@@ -49,8 +53,7 @@ export function renderMarkdown(v: PlanView): string {
   line(`## Special items`);
   line();
   if (!v.items.length && !v.goblins.length) line(`No special items used.`);
-  for (const i of v.items)
-    line(`- ${i.count}× ${i.label} ${i.source}${i.price != null ? ` (${i.price} ${i.currency} each)` : ""}`);
+  for (const i of v.items) line(`- **${i.count}× ${i.label}**: ${sourcesText(i.sources)}`);
   for (const g of v.goblins) line(`- ${g.name} hired for ${g.upgrades} upgrade(s): ${fmtNum(g.gems)} gems`);
   if (v.spent.length) line(`- **Total spent:** ${spentText(v.spent)}`);
   line();
