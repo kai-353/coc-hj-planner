@@ -43,6 +43,7 @@ bun test
 | `village` | Path to the export JSON |
 | `timezone`, `awake.from`, `awake.to` | When you can act. Everything is scheduled inside this window. |
 | `event.start`, `event.end`, `event.discount` | Hammer Jam window (2026: 1 Nov to 16 Nov 08:00 GMT) and time/cost multiplier (0.5) |
+| `freeBy` | Every upgrade must be finished by this ISO time (builders and lab free, e.g. for a new Town Hall). Omitted = the event end; `null` = upgrades only need to *start* before the end |
 | `planStart` | Optional ISO time to plan from (defaults to the export timestamp) |
 | `inventory` | Owned items plus `gems`, `leagueMedals`, `raidMedals`. Item keys: `builderPotion`, `researchPotion`, `bookOfBuilding`, `bookOfHeroes`, `bookOfFighting`, `bookOfSpells`, `bookOfEverything`, `hammerOfBuilding`, `hammerOfHeroes`, `hammerOfFighting`, `hammerOfSpells` |
 | `neverUse` | Items never used or bought. Defaults to all books and hammers (saved for the next Town Hall). |

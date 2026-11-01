@@ -262,6 +262,29 @@ export function SettingsCard() {
             }
           />
         </div>
+        <div className="space-y-2">
+          <label className="flex cursor-pointer items-center justify-between gap-3">
+            <span className="text-sm">
+              Builders & lab free by
+              <span className="block text-xs text-muted-foreground">Every upgrade finished, e.g. to start TH19</span>
+            </span>
+            <Switch
+              checked={settings.freeBy.enabled}
+              onCheckedChange={(enabled) => update({ freeBy: { ...settings.freeBy, enabled } })}
+            />
+          </label>
+          {settings.freeBy.enabled && (
+            <Input
+              aria-label="Builders and lab free by"
+              type="datetime-local"
+              value={toLocalInput(settings.freeBy.at ?? settings.eventEnd)}
+              onChange={(e) =>
+                e.target.value &&
+                update({ freeBy: { ...settings.freeBy, at: new Date(e.target.value).toISOString() } }, { debounce: true })
+              }
+            />
+          )}
+        </div>
         <div className="space-y-1.5">
           <Label htmlFor="goblin" className="text-xs text-muted-foreground">
             Goblin Builder / Researcher (gems per day)

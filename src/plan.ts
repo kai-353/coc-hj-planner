@@ -62,6 +62,8 @@ export interface Plan {
   clock: Clock;
   start: number;
   end: number;
+  /** Infinity when builders don't need to be free at a given time. */
+  freeBy: number;
   taskSet: TaskSet;
   results: Record<PlanQueue, SimResult>;
   simConfigs: Record<PlanQueue, SimConfig>;
@@ -79,6 +81,7 @@ export function makePlan(config: Config, village: Village, catalog: Catalog): Pl
   const start = Math.max(config.planStart ? parseIso(config.planStart) : exportAt, parseIso(config.event.start));
   const end = parseIso(config.event.end);
   if (end <= start) throw new Error("Plan start is after the event end.");
+  const freeBy = config.freeBy === null ? Infinity : parseIso(config.freeBy ?? config.event.end);
 
   const taskSet = buildTasks(village, catalog, {
     excludeCategories: new Set(config.exclude.categories),
@@ -113,6 +116,7 @@ export function makePlan(config: Config, village: Village, catalog: Catalog): Pl
         slotName: q === "builder" ? "Builder" : "Lab",
         start,
         end,
+        freeBy,
         clock,
         tasks: taskSet.tasks.filter((t) => t.queue === q),
         potionMultiplier: q === "builder" ? 10 : 24,
@@ -142,6 +146,7 @@ export function makePlan(config: Config, village: Village, catalog: Catalog): Pl
     clock,
     start,
     end,
+    freeBy,
     taskSet,
     results: opt.results,
     simConfigs,

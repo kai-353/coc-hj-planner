@@ -37,6 +37,11 @@ export interface Config {
   event: { start: string; end: string; discount: number };
   /** ISO time to plan from; defaults to the export timestamp. */
   planStart?: string;
+  /**
+   * Builders and lab must be free (every upgrade finished) by this ISO time, e.g. to start the next
+   * Town Hall right away. Omitted = the event end; null = upgrades only need to start before the end.
+   */
+  freeBy?: string | null;
   builders?: number;
   inventory: Partial<Record<ItemKey | Currency, number>>;
   /** Items that must never be used or bought (e.g. books/hammers saved for a new Town Hall). */

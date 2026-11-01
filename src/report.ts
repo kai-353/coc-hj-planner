@@ -31,17 +31,18 @@ export function renderMarkdown(v: PlanView): string {
   line(`- Planned from **${v.start}** until the event ends **${v.end}** (${v.timezone})`);
   line(`- Awake window: ${v.awake.from}–${v.awake.to}. Every start/finish/item below falls inside it.`);
   line(`- Builders: ${v.builders}, plus 1 lab (pets aren't planned)`);
+  if (v.freeBy) line(`- Builders and lab must be free by **${v.freeBy}**`);
   if (v.excluded.length) line(`- Excluded: ${v.excluded.join(", ")}`);
   if (v.neverUse.length) line(`- Never used: ${v.neverUse.join(", ")}`);
   line();
 
   line(`## Summary`);
   line();
-  line(`| Queue | Upgrades planned | Started before event end | Not started | Idle while awake | Idle overnight |`);
-  line(`|---|---|---|---|---|---|`);
+  line(`| Queue | Upgrades planned | Started before event end | Not started | Idle while awake | Idle overnight | Last finish |`);
+  line(`|---|---|---|---|---|---|---|`);
   for (const q of v.queues)
     line(
-      `| ${q.name} | ${q.planned} | ${q.started} | ${q.unstarted} (${fmtDuration(q.unstartedMin)}) | ${fmtDuration(q.idleAwakeMin)} | ${fmtDuration(q.nightIdleMin)} |`,
+      `| ${q.name} | ${q.planned} | ${q.started} | ${q.unstarted} (${fmtDuration(q.unstartedMin)}) | ${fmtDuration(q.idleAwakeMin)} | ${fmtDuration(q.nightIdleMin)} | ${q.lastFinish ?? "–"}${v.freeBy ? (q.freeInTime ? " ✅" : " ⚠ after free-by") : ""} |`,
     );
   line();
 

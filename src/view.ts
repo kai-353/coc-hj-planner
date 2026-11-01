@@ -44,6 +44,8 @@ export interface Timeline {
   start: number;
   end: number;
   eventEnd: number;
+  /** Builders/lab free-by time when it differs from the event end. */
+  freeBy: number | null;
   rows: { id: string; queue: PlanQueue; label: string }[];
   bars: {
     row: string;
@@ -82,7 +84,12 @@ export interface PlanView {
     unstartedMin: number;
     idleAwakeMin: number;
     nightIdleMin: number;
+    /** When the last upgrade in this queue finishes, and whether that's by the free-by time. */
+    lastFinish: string | null;
+    freeInTime: boolean;
   }[];
+  /** Builders and lab must be free by this time (null = no requirement). */
+  freeBy: string | null;
   items: { label: string; source: string; price: number | null; currency: string | null; count: number }[];
   goblins: { name: string; upgrades: number; gems: number }[];
   spent: { currency: Currency; label: string; amount: number }[];
@@ -223,8 +230,10 @@ export function buildPlanView(plan: Plan): PlanView {
     builders: plan.simConfigs.builder.slots,
     excluded: [...config.exclude.categories, ...config.exclude.names.map((n) => `"${n}"`)],
     neverUse: config.neverUse.map((k) => ITEMS[k].label),
+    freeBy: Number.isFinite(plan.freeBy) ? clock.dateTime(plan.freeBy) : null,
     queues: QUEUES.map((q) => {
       const r = results[q];
+      const last = Math.max(-Infinity, ...r.doneAt.values(), ...r.projectedDone.values());
       return {
         queue: q,
         name: plan.simConfigs[q].slotName,
@@ -234,6 +243,8 @@ export function buildPlanView(plan: Plan): PlanView {
         unstartedMin: r.unstartedMin,
         idleAwakeMin: r.idleAwakeMin,
         nightIdleMin: r.nightIdleMin,
+        lastFinish: last > -Infinity ? clock.dateTime(last) : null,
+        freeInTime: last <= plan.freeBy,
       };
     }),
     items: [...items.values()],
@@ -328,5 +339,6 @@ function buildTimeline(plan: Plan): Timeline {
     days.push({ t: midnight, label: clock.dayLabel(midnight).slice(0, 9) });
   }
 
-  return { start, end, eventEnd: plan.end, rows, bars, boosts, nights, days };
+  const freeBy = Number.isFinite(plan.freeBy) && plan.freeBy !== plan.end ? plan.freeBy : null;
+  return { start, end: Math.max(end, freeBy ?? end), eventEnd: plan.end, freeBy, rows, bars, boosts, nights, days };
 }

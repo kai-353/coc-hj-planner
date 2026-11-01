@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   BookOpen,
   ChartGantt,
+  CheckCircle2,
   FlaskConical,
   FlaskRound,
   Gem,
@@ -83,6 +84,13 @@ function Summary({ plan }: { plan: PlanView }) {
                 </span>
                 <span>Idle overnight {fmtDuration(q.nightIdleMin)}</span>
               </div>
+              {plan.freeBy && (
+                <div className={cn("flex items-center gap-1.5 text-xs", q.freeInTime ? "text-muted-foreground" : "text-destructive")}>
+                  {q.freeInTime ? <CheckCircle2 className="size-3.5" /> : <AlertTriangle className="size-3.5" />}
+                  {q.freeInTime ? "Free by" : "Still busy after"} {plan.freeBy}
+                  {q.lastFinish && ` (last finish ${q.lastFinish})`}
+                </div>
+              )}
             </CardContent>
           </Card>
         );

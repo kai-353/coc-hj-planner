@@ -80,6 +80,7 @@ export function TimelineChart({ timeline: tl, queues }: { timeline: Timeline; qu
               ))}
               <div className="absolute inset-x-0 border-b" style={{ top: 0, height: AXIS_H }} />
               <Marker x={x(tl.eventEnd)} label="Hammer Jam ends" />
+              {tl.freeBy != null && <Marker x={x(tl.freeBy)} label="Free by" />}
               {now > tl.start && now < tl.end && <Marker x={x(now)} label="Now" />}
 
               {/* Rows */}

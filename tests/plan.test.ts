@@ -139,6 +139,28 @@ describe("shop limits and potions", () => {
     }
   });
 
+  test("by default every upgrade finishes by the event end (builders and lab free)", () => {
+    for (const q of QUEUES) {
+      expect(plan.results[q].projectedDone.size).toBe(0);
+      for (const t of plan.results[q].doneAt.values()) expect(t).toBeLessThanOrEqual(plan.end);
+    }
+  });
+
+  test("freeBy: null lets upgrades run past the event end", () => {
+    const loose = makePlan(
+      {
+        ...DEFAULTS,
+        village: "",
+        freeBy: null,
+        inventory: { builderPotion: 4, researchPotion: 1, gems: 6000, leagueMedals: 2000, raidMedals: 5000 },
+        exclude: { categories: ["siege-machines", "supercharges", "guardians"], names: [] },
+      },
+      village,
+      catalog,
+    );
+    expect(QUEUES.some((q) => loose.results[q].projectedDone.size > 0)).toBe(true);
+  });
+
   test("back-to-back potion drinks are merged into one batch", () => {
     for (const q of QUEUES) {
       const drinks = plan.results[q].events.filter((e) => e.kind === "potion");

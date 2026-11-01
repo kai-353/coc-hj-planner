@@ -12,6 +12,8 @@ export interface Settings {
   awakeTo: string;
   eventEnd: string;
   planFromNow: boolean;
+  /** Builders and lab free by `at` (null = when Hammer Jam ends). */
+  freeBy: { enabled: boolean; at: string | null };
   goblinGemsPerDay: number;
   goldPass: { enabled: boolean } & GoldPass;
 }
@@ -32,6 +34,7 @@ export function defaultSettings(meta: Meta): Settings {
     awakeTo: meta.defaults.awake.to,
     eventEnd: meta.defaults.event.end,
     planFromNow: false,
+    freeBy: { enabled: true, at: null },
     goblinGemsPerDay: meta.defaults.goblinGemsPerDay ?? 40,
     goldPass: { enabled: meta.defaults.goldPass != null, ...meta.defaults.goldPass! },
   };
@@ -48,6 +51,7 @@ export function toConfig(s: Settings, meta: Meta) {
     awake: { from: s.awakeFrom, to: s.awakeTo },
     event: { ...meta.defaults.event, end: s.eventEnd },
     planStart: s.planFromNow ? new Date().toISOString() : undefined,
+    freeBy: s.freeBy.enabled ? (s.freeBy.at ?? s.eventEnd) : null,
     goblinGemsPerDay: s.goblinGemsPerDay,
     goldPass: s.goldPass.enabled ? (({ enabled, ...gp }) => gp)(s.goldPass) : null,
   };

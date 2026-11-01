@@ -57,6 +57,8 @@ export interface SimConfig {
   slotName: string;
   start: number;
   end: number;
+  /** Every upgrade must finish by this time (builders/lab free); Infinity = only start before `end`. */
+  freeBy: number;
   clock: Clock;
   tasks: Task[];
   /** Completion times of tasks in other queues (for cross-queue prerequisites). */
@@ -180,9 +182,10 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
   };
   const mostUrgent = (xs: Task[]) => xs.reduce((a, b) => (chain(b) > chain(a) ? b : a));
 
-  // Keep the longest stand-alone upgrades for each slot's last start (they may overrun the event).
+  // Keep the longest stand-alone upgrades for each slot's last start: they may overrun the event, as long
+  // as one started at the last chance still finishes by the free-by time.
   const reserved = () => {
-    const free = [...pending].filter((x) => !dependents.has(x.id));
+    const free = [...pending].filter((x) => !dependents.has(x.id) && x.durMin <= cfg.freeBy - lastAction);
     if (pending.size <= cfg.slots) return new Set<Task>();
     return new Set(free.sort((a, b) => b.durMin - a.durMin).slice(0, cfg.slots));
   };
@@ -219,7 +222,9 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
     return { idleSaved, value, efficiency: value / (boostable * extra) };
   };
 
-  const choose = (t: number, avail: Task[], res: Set<Task>): Task | undefined => {
+  const choose = (t: number, candidates: Task[], res: Set<Task>): Task | undefined => {
+    // Only upgrades that finish by the free-by time at normal speed (potions only make them earlier).
+    const avail = candidates.filter((x) => t + durAt(x, t) <= cfg.freeBy);
     if (!avail.length) return undefined;
     // An upgrade only "fits" if the slot frees up while the player can still start the next one.
     const fits = avail.filter((x) => !res.has(x) && t + durAt(x, t) <= lastAction);
