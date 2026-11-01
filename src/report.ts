@@ -95,12 +95,14 @@ export function renderMarkdown(v: PlanView): string {
     line(`## Walls (instant, no builder needed)`);
     line();
     for (const w of v.walls)
-      line(`- ${w.count}× level ${w.level} → ${w.maxLevel}: upgrade during the event while costs are discounted`);
+      line(
+        `- ${w.count}× level ${w.level} → ${w.maxLevel}: ${fmtNum(w.count * w.costEach)} ${w.resource} (${fmtNum(w.costEach)} each, discounted)`,
+      );
     line();
   }
 
   if (v.resources.length) {
-    line(`## Resources needed (discounted)`);
+    line(`## Resources needed (discounted, walls not included)`);
     line();
     for (const r of v.resources) line(`- ${r.resource}: ${fmtNum(r.amount)}`);
     line();

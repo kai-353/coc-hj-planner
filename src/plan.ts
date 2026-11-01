@@ -72,7 +72,8 @@ export interface Plan {
   ownedUsed: Partial<Record<ItemKey, number>>;
   /** Extra purchases that would be needed to start everything, if the budget falls short. */
   shortfall?: { acquisitions: Acquisition[]; spent: Record<Currency, number>; stillUnstarted: number };
-  walls: { level: number; count: number; maxLevel: number }[];
+  /** Walls below max, with the discounted cost of upgrading each one to max (Gold or Elixir). */
+  walls: { level: number; count: number; maxLevel: number; costEach: number; resource: string }[];
 }
 
 export function makePlan(config: Config, village: Village, catalog: Catalog): Plan {
@@ -154,7 +155,16 @@ export function makePlan(config: Config, village: Village, catalog: Catalog): Pl
     spent: opt.spent,
     ownedUsed: opt.ownedUsed,
     walls: village.walls
-      .map((w) => ({ ...w, maxLevel: catalog.maxLevelAt(WALL_ID, village.townHall) }))
+      .map((w) => {
+        const maxLevel = catalog.maxLevelAt(WALL_ID, village.townHall);
+        const steps = catalog.get(WALL_ID)!.levels.filter((l) => l.level > w.level && l.level <= maxLevel);
+        return {
+          ...w,
+          maxLevel,
+          costEach: steps.reduce((a, l) => a + Math.round(l.cost * config.event.discount), 0),
+          resource: steps.at(-1)?.resource ?? "",
+        };
+      })
       .filter((w) => w.level < w.maxLevel),
   };
 

@@ -421,7 +421,7 @@ function Resources({ plan }: { plan: PlanView }) {
       <Card>
         <CardHeader>
           <CardTitle>Resources needed</CardTitle>
-          <CardDescription>Discounted cost of everything that starts</CardDescription>
+          <CardDescription>Discounted cost of everything that starts (walls are listed separately)</CardDescription>
         </CardHeader>
         <CardContent>
           {plan.resources.length ? (
@@ -452,8 +452,16 @@ function Resources({ plan }: { plan: PlanView }) {
           {plan.walls.length ? (
             <ul className="space-y-2 text-sm">
               {plan.walls.map((w) => (
-                <li key={w.level}>
-                  {w.count}× level {w.level} → {w.maxLevel}
+                <li key={w.level} className="flex justify-between gap-4">
+                  <span>
+                    {w.count}× level {w.level} → {w.maxLevel}
+                  </span>
+                  <span className="text-right">
+                    <span className="font-medium tabular-nums">{fmtNum(w.count * w.costEach)}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {w.resource} · {fmtNum(w.costEach)} each
+                    </span>
+                  </span>
                 </li>
               ))}
             </ul>

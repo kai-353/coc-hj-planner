@@ -108,7 +108,7 @@ export interface PlanView {
   days: { key: string; label: string; rows: ScheduleRow[] }[];
   timeline: Timeline;
   unstarted: (TaskRef & { durMin: number; fullDurMin: number })[];
-  walls: { level: number; count: number; maxLevel: number }[];
+  walls: Plan["walls"];
   resources: { resource: string; amount: number }[];
   skipped: (TaskRef & { reason: string })[];
 }
