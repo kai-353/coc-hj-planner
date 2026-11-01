@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Catalog } from "../src/catalog";
 import { DEFAULTS } from "../src/config";
 import { makePlan, QUEUES } from "../src/plan";
+import { buildTasks } from "../src/tasks";
 import { Clock, parseIso } from "../src/time";
 import { parseVillage } from "../src/village";
 
@@ -106,13 +107,21 @@ describe("shop limits and potions", () => {
       }
   });
 
+  test("back-to-back potion drinks are merged into one batch", () => {
+    for (const q of QUEUES) {
+      const drinks = plan.results[q].events.filter((e) => e.kind === "potion");
+      for (let i = 1; i < drinks.length; i++) expect(drinks[i]!.t).not.toBe(drinks[i - 1]!.until);
+    }
+  });
+
   test("name exclusions ignore case, spaces and punctuation", () => {
-    const p = makePlan(
-      { ...DEFAULTS, village: "", exclude: { categories: [], names: ["cloneSpell", "GOLD storage"] } },
-      village,
-      catalog,
-    );
-    const names = new Set(p.taskSet.tasks.map((t) => t.name));
+    const { tasks } = buildTasks(village, catalog, {
+      excludeCategories: new Set(),
+      excludeNames: ["cloneSpell", "GOLD storage"],
+      discount: 0.5,
+      elapsedMin: 0,
+    });
+    const names = new Set(tasks.map((t) => t.name));
     expect(names.has("Clone Spell")).toBe(false);
     expect(names.has("Gold Storage")).toBe(false);
     expect(names.has("Elixir Storage")).toBe(true);

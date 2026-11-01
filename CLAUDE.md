@@ -55,9 +55,11 @@ Runtime is **Bun** (Node is not installed): `bun run dev` (web app), `bun run pl
 | Goblin Builder / Goblin Researcher | Extra temporary builder / researcher, **40 gems per day** of upgrade time | In the lab this doubles throughput on top of the halved times (4× normal pace) |
 | Gem finishing | 1 min = 1 gem, 1 h = 20, 1 d = 260, 7 d = 1000 (interpolated) | `calculators().gems().cost()` in the package. Not used, per user preference. |
 
-- **Potions stack**: drinking k at once extends the boost to k hours. The planner schedules batches
-  ("Drink 3× Builder Potion at 23:00") and prefers the last awake moment of the day, so the boost runs
-  while the player sleeps. Boost on an upgrade that finishes while asleep is wasted.
+- **Potions stack**: drinking k at once extends the boost to k hours ("Drink 3× Builder Potion").
+  There is no preferred time of day: the planner optimises builder/lab uptime with as few items as
+  possible. A batch is drunk when it pulls finishes out of the night (so the next upgrade starts before
+  bed) and otherwise potions are spread evenly; back-to-back drinks are merged into one batch. Boost on
+  an upgrade that finishes while asleep is wasted.
 - The Raid Medal Trader's weekly limits reset **Tuesdays 08:00 UTC** (`shopWeekReset`, `limitPerWeek`).
 - Nothing can start after the last awake moment before the event ends, so progress after it doesn't
   help; an upgrade only "fits" if it ends before that moment.

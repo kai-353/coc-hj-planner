@@ -6,10 +6,9 @@
 //   ends; the longest remaining upgrades are kept for last because they may run past the event end
 //   (the discount is locked in when the upgrade starts).
 // - Potions multiply the speed of every busy slot for one hour each and stack: drinking k at once boosts
-//   for k hours. Batches are drunk at the end of the day so the boost runs while the player sleeps;
-//   daytime batches only happen when there are more potions than the remaining nights can absorb.
-// - A helper (Builder's Apprentice /
-//   Lab Assistant) adds `workRate` hours of progress to one regular slot for one hour, once per cooldown.
+//   for k hours. They are drunk when they keep slots busy (pulling a finish out of the night so the next
+//   upgrade can start before bed) and otherwise spread evenly over the event, never at a fixed time.
+// - A helper (Builder's Apprentice / Lab Assistant) adds `workRate` hours of progress to one regular slot for one hour, once per cooldown.
 // - The Goblin Builder / Goblin Researcher is an extra slot paid in gems per day of upgrade time; the
 //   allocation says how many upgrades it may take on.
 // - Books complete an upgrade right after it is started; hammers complete one without needing a slot.
@@ -105,8 +104,8 @@ interface Slot {
   rem: number;
 }
 
-/** Potions per night that typically still land on running upgrades. */
-const NIGHT_BATCH = 3;
+/** Largest potion batch considered at once. */
+const MAX_BATCH = 6;
 
 const longest = (xs: Task[]) => xs.reduce((a, b) => (b.durMin > a.durMin ? b : a));
 
@@ -147,6 +146,7 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
   const potionQueue = [...alloc.potions].sort((a, b) => a.availableAt - b.availableAt);
   let goblinLeft = cfg.goblin ? alloc.goblinTasks : 0;
   let potionUntil = -1;
+  let lastPotion: Extract<SimEvent, { kind: "potion" }> | undefined;
   let helperUntil = -1;
   let helperSlot: Slot | undefined;
   let helperNext = cfg.helper?.availableAt ?? Infinity;
@@ -186,28 +186,29 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
   let lastAction = end - 1;
   while (lastAction > start && !clock.isAwake(lastAction)) lastAction--;
 
-  const isEvening = (t: number) => !clock.isAwake(t + HOUR);
-  /** Evenings (including this one) after which there is still an awake period before the event ends. */
-  const eveningsLeft = (t: number) => {
-    const days = Math.round((lastAction - clock.minuteOfDay(lastAction) - (t - clock.minuteOfDay(t))) / DAY);
-    return Math.max(0, days);
-  };
+  /** Slot-minutes a slot sits idle if its upgrade finishes at `f` (nothing can start until morning). */
+  const idleAfter = (f: number) => (f >= lastAction || clock.isAwake(f) ? 0 : clock.nextAwake(f) - f);
 
-  /** Share of a k-hour boost that turns into useful progress. */
-  const boostUse = (t: number, k: number, busy: Slot[], boostable: number) => {
-    const cap = M * k * HOUR;
-    let useful = 0;
+  /**
+   * Value of drinking k potions now, in slot-minutes: extra progress that isn't wasted plus idle time
+   * saved by moving finishes out of the night (minus idle created by moving them into it).
+   * `efficiency` compares that to the ideal of every slot using the full boost.
+   */
+  const batchValue = (t: number, k: number, busy: Slot[], boostable: number) => {
+    const boost = k * HOUR;
+    const extra = (M - 1) * boost;
+    let gain = 0;
+    let idleSaved = 0;
     for (const s of busy) {
-      if (s.rem >= cap) useful += cap;
-      // Finishing while awake is fine: the slot gets a new upgrade and keeps using the boost.
-      else useful += clock.isAwake(t + s.rem / M) ? cap : s.rem;
+      const before = t + s.rem;
+      const after = s.rem >= M * boost ? before - extra : t + s.rem / M;
+      idleSaved += idleAfter(before) - idleAfter(after);
+      // A slot that finishes during the boost while awake gets a new upgrade and keeps the boost;
+      // finishing while asleep wastes the rest of it.
+      gain += s.rem >= M * boost || clock.isAwake(after) ? extra : Math.max(0, before - after);
     }
-    return useful / (boostable * cap);
-  };
-
-  const bestBatch = (t: number, max: number, minUse: number, busy: Slot[], boostable: number) => {
-    for (let k = max; k >= 1; k--) if (boostUse(t, k, busy, boostable) >= minUse) return k;
-    return 0;
+    const value = gain + idleSaved;
+    return { idleSaved, value, efficiency: value / (boostable * extra) };
   };
 
   const choose = (t: number, avail: Task[], res: Set<Task>): Task | undefined => {
@@ -266,25 +267,37 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
     const busy = slots.filter((s) => s.task);
     const regularFree = slots.some((s) => isRegular(s) && !s.task);
 
-    // Potions, drunk in batches (they stack). Evening batches bridge the night; spread what's left
-    // over the remaining evenings and only drink during the day when the nights can't absorb it all.
+    // Potions (they stack, so a batch of k boosts for k hours). Drink when a batch keeps slots busy by
+    // pulling finishes out of the night; otherwise keep pace with an even spread over the event, only
+    // when nearly all of the boost is useful. Near the end, use whatever is left.
     const ready = potionQueue.filter((p) => p.availableAt <= t).length;
     if (ready > 0 && t >= potionUntil && t < lastAction && busy.length) {
       const boostable = slots.filter((s) => !s.temp && (s.task || !s.goblin)).length;
-      const evenings = eveningsLeft(t);
-      let k = 0;
-      if (isEvening(t) && evenings > 0) {
-        const target = Math.min(ready, Math.ceil(potionQueue.length / evenings));
-        k = bestBatch(t, target, 0.6, busy, boostable);
+      const used = alloc.potions.length - potionQueue.length;
+      const due = Math.ceil((alloc.potions.length * (t - start)) / (lastAction - start)) - used;
+      const finalDay = lastAction - t < DAY;
+      let best: { k: number; per: number } | undefined;
+      for (let k = 1; k <= Math.min(ready, MAX_BATCH); k++) {
+        const v = batchValue(t, k, busy, boostable);
+        const ok =
+          (v.idleSaved > 0 && v.efficiency >= 0.6) ||
+          (v.idleSaved >= 0 && k <= Math.max(due, finalDay ? ready : 0) && v.efficiency >= (finalDay ? 0.5 : 0.85));
+        if (ok && (!best || v.efficiency > best.per + 1e-9)) best = { k, per: v.efficiency };
       }
-      // Long overnight batches waste boost on upgrades that finish while asleep, so assume the
-      // remaining nights take a few potions each and drink the rest during the day.
-      const surplus = potionQueue.length - (evenings - (isEvening(t) ? 1 : 0)) * NIGHT_BATCH;
-      if (!k && surplus > 0) k = bestBatch(t, Math.min(ready, surplus), 0.8, busy, boostable);
+      const k = best?.k ?? 0;
       if (k) {
         const uses = potionQueue.splice(0, k);
         potionUntil = t + k * HOUR;
-        events.push({ t, kind: "potion", uses, until: potionUntil });
+        // Stacking makes a drink right as the previous boost ends the same as drinking them together
+        // earlier, so report one batch (if the potions were already available back then).
+        const prev = lastPotion?.until === t && uses.every((u) => u.availableAt <= lastPotion!.t) ? lastPotion : undefined;
+        if (prev) {
+          prev.uses.push(...uses);
+          prev.until = potionUntil;
+        } else {
+          lastPotion = { t, kind: "potion", uses, until: potionUntil };
+          events.push(lastPotion);
+        }
       }
     }
 
