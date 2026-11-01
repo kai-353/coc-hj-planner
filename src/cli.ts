@@ -3,6 +3,7 @@ import { CATEGORIES, Catalog } from "./catalog";
 import { loadConfig } from "./config";
 import { makePlan, QUEUES } from "./plan";
 import { renderMarkdown } from "./report";
+import { buildPlanView } from "./view";
 import { buildTasks } from "./tasks";
 import { fmtDuration } from "./time";
 import { parseVillage } from "./village";
@@ -47,7 +48,7 @@ if (values.remaining) {
 
 const t0 = performance.now();
 const plan = makePlan(config, village, catalog);
-await Bun.write(values.out!, renderMarkdown(plan));
+await Bun.write(values.out!, renderMarkdown(buildPlanView(plan)));
 
 for (const q of QUEUES) {
   const r = plan.results[q];

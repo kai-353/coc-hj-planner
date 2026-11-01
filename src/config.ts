@@ -95,7 +95,11 @@ export const DEFAULTS: Omit<Config, "village"> = {
 };
 
 export async function loadConfig(path: string): Promise<Config> {
-  const user = await Bun.file(path).json();
+  return resolveConfig(await Bun.file(path).json());
+}
+
+/** Fills in defaults and validates a user config object. */
+export function resolveConfig(user: any): Config {
   const cfg: Config = {
     ...DEFAULTS,
     ...user,
