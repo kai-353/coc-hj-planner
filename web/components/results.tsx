@@ -1,10 +1,12 @@
 import {
   AlertTriangle,
   BookOpen,
+  ChartGantt,
   FlaskConical,
   FlaskRound,
   Gem,
   Hammer,
+  List,
   Moon,
   Sparkles,
   UserCog,
@@ -12,6 +14,7 @@ import {
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { fmtDuration } from "../../src/time";
+import { TimelineChart } from "@/components/timeline";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -182,6 +185,7 @@ const isItemRow = (r: ScheduleRow) => r.kind === "potion" || r.kind === "helper"
 
 function Schedule({ plan }: { plan: PlanView }) {
   const [filter, setFilter] = useState<Filter>("all");
+  const [mode, setMode] = useState<"list" | "timeline">("list");
   const nowMin = Math.floor(Date.now() / 60_000);
   const todayRef = useRef<HTMLDivElement>(null);
 
@@ -191,7 +195,7 @@ function Schedule({ plan }: { plan: PlanView }) {
         .map((d) => ({
           ...d,
           rows: d.rows.filter((r) =>
-            filter === "all" ? true : filter === "items" ? isItemRow(r) || (r.kind === "start" && r.gems > 0) : r.queue === filter,
+            filter === "all" ? true : filter === "items" ? isItemRow(r) : r.queue === filter,
           ),
         }))
         .filter((d) => d.rows.length),
@@ -201,20 +205,51 @@ function Schedule({ plan }: { plan: PlanView }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <ToggleGroup type="single" variant="outline" value={filter} onValueChange={(v) => v && setFilter(v as Filter)}>
+      <div className="flex flex-wrap items-center gap-2">
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          value={mode}
+          onValueChange={(v) => v && setMode(v as typeof mode)}
+          aria-label="Schedule view"
+        >
+          <ToggleGroupItem value="list">
+            <List /> List
+          </ToggleGroupItem>
+          <ToggleGroupItem value="timeline">
+            <ChartGantt /> Timeline
+          </ToggleGroupItem>
+        </ToggleGroup>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          value={mode === "timeline" && filter === "items" ? "all" : filter}
+          onValueChange={(v) => v && setFilter(v as Filter)}
+          aria-label="Show"
+        >
           <ToggleGroupItem value="all">All</ToggleGroupItem>
           <ToggleGroupItem value="builder">Builders</ToggleGroupItem>
           <ToggleGroupItem value="lab">Lab</ToggleGroupItem>
-          <ToggleGroupItem value="items">Items & gems</ToggleGroupItem>
+          {mode === "list" && <ToggleGroupItem value="items">Items</ToggleGroupItem>}
         </ToggleGroup>
-        {currentDay && (
-          <Button variant="ghost" size="sm" onClick={() => todayRef.current?.scrollIntoView({ block: "start", behavior: "smooth" })}>
+        {mode === "list" && currentDay && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            onClick={() => todayRef.current?.scrollIntoView({ block: "start", behavior: "smooth" })}
+          >
             Jump to now
           </Button>
         )}
       </div>
-      {days.map((day) => (
+      {mode === "timeline" && (
+        <TimelineChart
+          timeline={plan.timeline}
+          queues={filter === "builder" ? ["builder"] : filter === "lab" ? ["lab"] : ["builder", "lab"]}
+        />
+      )}
+      {mode === "list" && days.map((day) => (
         <Card key={day.key} ref={day.key === currentDay ? todayRef : undefined} className="scroll-mt-4 gap-0 py-0">
           <div className="border-b px-4 py-3 text-sm font-semibold">
             {day.label}
@@ -244,9 +279,15 @@ const ICONS = {
   hammer: Hammer,
 } as const;
 
-function TaskName({ task }: { task: TaskRef }) {
+export function TaskImage({ task, className }: { task: TaskRef; className?: string }) {
+  if (!task.image) return null;
+  return <img src={task.image} alt="" loading="lazy" className={cn("shrink-0 object-contain", className)} />;
+}
+
+function TaskName({ task, withImage = false }: { task: TaskRef; withImage?: boolean }) {
   return (
     <>
+      {withImage && <TaskImage task={task} className="mr-1.5 inline size-5 align-text-bottom" />}
       <span className="font-medium">{task.label}</span> <span className="text-muted-foreground">{task.step}</span>
     </>
   );
@@ -257,12 +298,18 @@ function Row({ row: r, past }: { row: ScheduleRow; past: boolean }) {
   return (
     <li className={cn("flex gap-3 px-4 py-2.5 text-sm", past && "opacity-50", r.kind === "overnight" && "bg-amber-500/5")}>
       <span className="w-11 shrink-0 pt-0.5 font-mono text-xs tabular-nums text-muted-foreground">{r.time}</span>
-      <Icon
-        className={cn(
-          "mt-0.5 size-4 shrink-0",
-          r.kind === "overnight" ? "text-amber-600" : r.kind === "start" ? "text-muted-foreground" : "text-primary",
-        )}
-      />
+      {r.kind === "start" && r.task.image ? (
+        <TaskImage task={r.task} className="size-8 -my-1" />
+      ) : (
+        <span className="flex w-8 shrink-0 justify-center">
+          <Icon
+            className={cn(
+              "mt-0.5 size-4",
+              r.kind === "overnight" ? "text-amber-600" : r.kind === "start" ? "text-muted-foreground" : "text-primary",
+            )}
+          />
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         {r.kind === "start" && (
           <>
@@ -332,7 +379,7 @@ function Unstarted({ plan }: { plan: PlanView }) {
           {plan.unstarted.map((t) => (
             <TableRow key={`${t.label}|${t.step}`}>
               <TableCell>
-                <TaskName task={t} />
+                <TaskName task={t} withImage />
               </TableCell>
               <TableCell className="text-right tabular-nums">{fmtDuration(t.durMin)}</TableCell>
               <TableCell className="text-right tabular-nums text-muted-foreground">{fmtDuration(t.fullDurMin)}</TableCell>
@@ -405,7 +452,7 @@ function Skipped({ plan }: { plan: PlanView }) {
           {plan.skipped.map((s) => (
             <TableRow key={`${s.label}|${s.step}`}>
               <TableCell>
-                <TaskName task={s} />
+                <TaskName task={s} withImage />
               </TableCell>
               <TableCell className="text-muted-foreground">{s.reason}</TableCell>
             </TableRow>

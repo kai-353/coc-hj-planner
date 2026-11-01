@@ -22,6 +22,8 @@ export interface Task {
   /** e.g. "17→18" or "SC 1→2" */
   step: string;
   supercharge: boolean;
+  /** Package-relative picture of the target level (or the entity icon). */
+  image?: string;
   /** Duration if started now (Hammer Jam discount applied). */
   durMin: number;
   fullDurMin: number;
@@ -113,6 +115,7 @@ export function buildTasks(village: Village, catalog: Catalog, o: TaskOptions): 
         label: inst.label,
         step,
         supercharge: l.supercharge,
+        image: l.image ?? e.icon ?? e.levels.findLast((x) => x.image)?.image,
         durMin: Math.round(fullDurMin * o.discount),
         fullDurMin,
         cost: Math.round(l.cost * o.discount),

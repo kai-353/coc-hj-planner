@@ -3,6 +3,7 @@
 import type { Currency } from "./config";
 import { ITEMS, type Plan, type PlanQueue, QUEUES } from "./plan";
 import { GOBLIN_SLOT } from "./sim";
+import { DAY } from "./time";
 import type { Task } from "./tasks";
 
 export const CURRENCY_LABEL: Record<Currency, string> = {
@@ -21,6 +22,8 @@ export const SOURCE_LABEL = {
 export interface TaskRef {
   label: string;
   step: string;
+  /** URL of the upgrade's picture, served by the web server under /img/. */
+  image?: string;
 }
 
 export type ScheduleRow = {
@@ -35,6 +38,30 @@ export type ScheduleRow = {
   | { kind: "helper"; helper: string; task: TaskRef }
   | { kind: "book" | "hammer"; item: string; task: TaskRef }
 );
+
+export interface Timeline {
+  /** Epoch minutes; the chart spans start → last bar end. */
+  start: number;
+  end: number;
+  eventEnd: number;
+  rows: { id: string; queue: PlanQueue; label: string }[];
+  bars: {
+    row: string;
+    task: TaskRef;
+    start: number;
+    end: number;
+    startLabel: string;
+    endLabel: string;
+    durMin: number;
+    gems: number;
+    /** Already running in the export (started before the plan). */
+    running: boolean;
+  }[];
+  boosts: { queue: PlanQueue; from: number; to: number; label: string }[];
+  nights: { from: number; to: number }[];
+  /** Local midnights inside the span, for the day axis. */
+  days: { t: number; label: string }[];
+}
 
 export interface PlanView {
   tag: string;
@@ -65,13 +92,18 @@ export interface PlanView {
     stillUnstartedMin: number;
   } | null;
   days: { key: string; label: string; rows: ScheduleRow[] }[];
+  timeline: Timeline;
   unstarted: (TaskRef & { durMin: number; fullDurMin: number })[];
   walls: { level: number; count: number; maxLevel: number }[];
   resources: { resource: string; amount: number }[];
   skipped: (TaskRef & { reason: string })[];
 }
 
-const ref = (t: Task): TaskRef => ({ label: t.label, step: t.step });
+const ref = (t: Task): TaskRef => ({
+  label: t.label,
+  step: t.step,
+  image: t.image ? `/img/${t.image.replace(/^images\//, "")}` : undefined,
+});
 
 const spentList = (spent: Record<Currency, number>) =>
   (Object.keys(spent) as Currency[])
@@ -174,6 +206,8 @@ export function buildPlanView(plan: Plan): PlanView {
     days.at(-1)!.rows.push(r);
   }
 
+  const timeline = buildTimeline(plan);
+
   const resources = new Map<string, number>();
   for (const q of QUEUES)
     for (const t of plan.simConfigs[q].tasks)
@@ -211,6 +245,7 @@ export function buildPlanView(plan: Plan): PlanView {
     spent: spentList(plan.spent),
     shortfall,
     days,
+    timeline,
     unstarted: QUEUES.flatMap((q) => results[q].unstarted)
       .sort((a, b) => b.durMin - a.durMin)
       .map((t) => ({ ...ref(t), durMin: t.durMin, fullDurMin: t.fullDurMin })),
@@ -218,4 +253,80 @@ export function buildPlanView(plan: Plan): PlanView {
     resources: [...resources].map(([resource, amount]) => ({ resource, amount })),
     skipped: plan.taskSet.skipped,
   };
+}
+
+function buildTimeline(plan: Plan): Timeline {
+  const { clock, results } = plan;
+  const rows: Timeline["rows"] = [];
+  const bars: Timeline["bars"] = [];
+  const boosts: Timeline["boosts"] = [];
+
+  for (const q of QUEUES) {
+    const sc = plan.simConfigs[q];
+    const r = results[q];
+    const rowId = (slot: number) => `${q}:${slot}`;
+    const slotIds = new Set<number>();
+    const bar = (slot: number, task: Task, start: number, end: number, durMin: number, gems: number, running: boolean) => {
+      slotIds.add(slot);
+      bars.push({
+        row: rowId(slot),
+        task: ref(task),
+        start,
+        end,
+        startLabel: running ? "before the plan" : clock.dateTime(start),
+        endLabel: clock.dateTime(end),
+        durMin,
+        gems,
+        running,
+      });
+    };
+
+    for (let i = 1; i <= sc.slots; i++) slotIds.add(i);
+    if (sc.goblin) slotIds.add(GOBLIN_SLOT);
+    for (const e of r.events) {
+      if (e.kind === "start") {
+        const end = r.doneAt.get(e.task.id) ?? r.projectedDone.get(e.task.id) ?? e.t + e.durMin;
+        bar(e.slot, e.task, e.t, end, e.durMin, e.gems, false);
+      } else if (e.kind === "finish" && e.task.ongoing) {
+        bar(e.slot, e.task, plan.start, e.t, e.task.ongoing.remainingMin, 0, true);
+      } else if (e.kind === "potion") {
+        boosts.push({ queue: q, from: e.t, to: e.until, label: `${e.uses.length}× ${e.uses[0]!.label}` });
+      }
+    }
+
+    const ordered = [...slotIds].sort((a, b) => (a === GOBLIN_SLOT ? 1 : b === GOBLIN_SLOT ? -1 : a - b));
+    for (const slot of ordered)
+      rows.push({
+        id: rowId(slot),
+        queue: q,
+        label:
+          slot === GOBLIN_SLOT
+            ? sc.goblin!.name
+            : slot > sc.slots
+              ? `Extra ${sc.slotName.toLowerCase()}`
+              : sc.slots > 1
+                ? `${sc.slotName} ${slot}`
+                : sc.slotName,
+      });
+  }
+
+  const start = plan.start;
+  const end = Math.max(plan.end, ...bars.map((b) => b.end));
+
+  const nights: Timeline["nights"] = [];
+  for (let t = start; t < end; ) {
+    const from = clock.isAwake(t) ? t - clock.minuteOfDay(t) + clock.awakeTo + 1 : t;
+    const to = clock.nextAwake(from);
+    nights.push({ from, to: Math.min(to, end) });
+    t = to + 1;
+  }
+
+  const days: Timeline["days"] = [];
+  for (let t = start - clock.minuteOfDay(start) + DAY; t < end; t += DAY) {
+    // Re-align to local midnight in case a DST change happened since the start.
+    const midnight = t - (clock.minuteOfDay(t) > 12 * 60 ? clock.minuteOfDay(t) - DAY : clock.minuteOfDay(t));
+    days.push({ t: midnight, label: clock.dayLabel(midnight).slice(0, 9) });
+  }
+
+  return { start, end, eventEnd: plan.end, rows, bars, boosts, nights, days };
 }

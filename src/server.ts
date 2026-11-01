@@ -2,7 +2,8 @@
 
 import { serve } from "bun";
 import index from "../web/index.html";
-import { CATEGORIES, Catalog } from "./catalog";
+import { resolve, sep } from "node:path";
+import { CATEGORIES, Catalog, PACKAGE_DIR } from "./catalog";
 import { DEFAULTS, ITEM_KEYS, resolveConfig } from "./config";
 import { ITEMS, makePlan } from "./plan";
 import { buildTasks } from "./tasks";
@@ -11,6 +12,7 @@ import { buildPlanView } from "./view";
 import { parseVillage } from "./village";
 
 const catalog = await Catalog.load();
+const IMAGES_DIR = resolve(PACKAGE_DIR, "images");
 
 /** Categories that are always skipped, so the UI doesn't offer them. */
 const ALWAYS_SKIPPED = new Set(["crafted-defenses", "pets"]);
@@ -39,6 +41,23 @@ const badRequest = (e: unknown) =>
 const server = serve({
   routes: {
     "/*": index,
+
+    // Pictures from clash-of-clans-data (WebP files despite the .png names).
+    "/img/*": async (req) => {
+      const rel = decodeURIComponent(new URL(req.url).pathname.slice("/img/".length));
+      const path = resolve(IMAGES_DIR, rel);
+      if (!path.startsWith(IMAGES_DIR + sep)) return new Response("Not found", { status: 404 });
+      const file = Bun.file(path);
+      if (!(await file.exists())) return new Response("Not found", { status: 404 });
+      const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+      const isWebp = String.fromCharCode(...head) === "RIFF";
+      return new Response(file, {
+        headers: {
+          "Content-Type": isWebp ? "image/webp" : file.type,
+          "Cache-Control": "public, max-age=86400",
+        },
+      });
+    },
 
     "/api/meta": {
       GET: () =>

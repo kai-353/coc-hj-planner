@@ -11,6 +11,11 @@ Runtime is **Bun** (Node is not installed): `bun run dev` (web app), `bun run pl
 - Frontend state lives in `web/providers/planner-provider.tsx` (`usePlanner()` / `useReadyPlanner()`):
   settings, uploaded village, debouncing, localStorage. All API calls go through TanStack Query hooks
   in `web/lib/queries.ts`; `App.tsx` is layout only. Don't add API state to components.
+- Pictures come from `clash-of-clans-data` (`levels[n].images.normal`, or `images.icon` for troops,
+  spells, heroes, pets); they're WebP despite `.png` names and are served under `/img/` by
+  `src/server.ts`. Tasks carry the target level's picture.
+- Chart colours are the `--viz-*` tokens in `web/index.css` (validated with the dataviz palette
+  checker for light and dark); the schedule timeline is `web/components/timeline.tsx`.
 - Adding shadcn components: `bunx --bun shadcn@latest add <name>`. The CLI has written
   `import { cn } from "cn"` before; fix it to `@/lib/utils`.
 - Commit regularly in small steps.

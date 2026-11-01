@@ -38,6 +38,8 @@ export interface LevelInfo {
   laboratory?: number;
   petHouse?: number;
   heroHall?: number;
+  /** Package-relative image of this level (e.g. "images/home/…/level-18.png"). */
+  image?: string;
 }
 
 export interface Entity {
@@ -48,6 +50,8 @@ export interface Entity {
   itemClass: ItemClass;
   levels: LevelInfo[];
   supercharges: LevelInfo[];
+  /** Package-relative icon (troops, spells, heroes, pets). */
+  icon?: string;
 }
 
 export const LABORATORY_ID = 1000007;
@@ -95,8 +99,12 @@ function toLevel(l: any): LevelInfo {
     laboratory: l.laboratoryRequired || undefined,
     petHouse: l.petHouseLevelRequired || undefined,
     heroHall: l.heroHallLevelRequired || undefined,
+    image: l.images?.normal,
   };
 }
+
+/** Root of the package's image assets (paths in the data are relative to the package root). */
+export const PACKAGE_DIR = join(dirname(Bun.resolveSync("clash-of-clans-data", import.meta.dir)), "..");
 
 export class Catalog {
   readonly byId = new Map<number, Entity>();
@@ -105,7 +113,7 @@ export class Catalog {
 
   static async load(): Promise<Catalog> {
     const cat = new Catalog();
-    const dataDir = join(dirname(Bun.resolveSync("clash-of-clans-data", import.meta.dir)), "..", "data", "home");
+    const dataDir = join(PACKAGE_DIR, "data", "home");
 
     for await (const rel of new Glob("*/*.json").scan(dataDir)) {
       const dir = rel.split("/")[0]!;
@@ -135,6 +143,7 @@ export class Catalog {
         ...meta,
         levels: levels.filter((l) => !l.supercharge),
         supercharges: levels.filter((l) => l.supercharge),
+        icon: raw.images?.icon,
       });
     }
     return cat;

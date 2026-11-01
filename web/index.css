@@ -9,3 +9,21 @@
     @apply min-h-screen bg-background text-foreground antialiased;
   }
 }
+
+/* Chart tokens (validated with the dataviz palette checker for both modes). */
+:root {
+  --viz-series-1: #2a78d6;
+  --viz-series-2: #eb6834;
+  --viz-running: #898781;
+  --viz-grid: #e1e0d9;
+  --viz-night: rgb(11 11 11 / 0.07);
+  --viz-on-fill: #ffffff;
+}
+.dark {
+  --viz-series-1: #3987e5;
+  --viz-series-2: #d95926;
+  --viz-running: #6f6e69;
+  --viz-grid: #2c2c2a;
+  --viz-night: rgb(255 255 255 / 0.06);
+  --viz-on-fill: #ffffff;
+}
