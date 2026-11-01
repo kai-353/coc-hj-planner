@@ -364,7 +364,8 @@ function buildTimeline(plan: Plan): Timeline {
 
   const nights: Timeline["nights"] = [];
   for (let t = start; t < end; ) {
-    const from = clock.isAwake(t) ? t - clock.minuteOfDay(t) + clock.awakeTo + 1 : t;
+    const from = clock.nextAsleep(t);
+    if (from >= end) break;
     const to = clock.nextAwake(from);
     nights.push({ from, to: Math.min(to, end) });
     t = to + 1;

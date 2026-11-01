@@ -303,6 +303,18 @@ export function ExclusionsCard() {
   );
 }
 
+/** "Asleep 01:00–09:00 (8h)": the window may cross midnight (awake 09:00 until 01:00). */
+function sleepSummary(from: string, to: string) {
+  const minutes = (hhmm: string) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    return (h ?? 0) * 60 + (m ?? 0);
+  };
+  if (!from || !to) return "";
+  if (from === to) return "Awake around the clock";
+  const sleep = (minutes(from) - minutes(to) + 24 * 60) % (24 * 60);
+  return `Asleep ${to}–${from} (${fmtDuration(sleep)})`;
+}
+
 const toLocalInput = (iso: string) => {
   const d = new Date(iso);
   return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
@@ -330,6 +342,7 @@ export function SettingsCard() {
             </Label>
             <Input id="awake-to" type="time" value={settings.awakeTo} onChange={(e) => update({ awakeTo: e.target.value }, { debounce: true })} />
           </div>
+          <p className="col-span-2 text-xs text-muted-foreground">{sleepSummary(settings.awakeFrom, settings.awakeTo)}</p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="event-end" className="text-xs text-muted-foreground">

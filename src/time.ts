@@ -66,19 +66,38 @@ export class Clock {
     return (((t + this.offset(t)) % DAY) + DAY) % DAY;
   }
 
+  /** Equal times mean awake around the clock. */
+  get alwaysAwake(): boolean {
+    return this.awakeFrom === this.awakeTo;
+  }
+
+  /** The window may wrap past midnight, e.g. awake 09:00 until 01:00. */
   isAwake(t: number): boolean {
+    if (this.alwaysAwake) return true;
     const m = this.minuteOfDay(t);
-    return m >= this.awakeFrom && m <= this.awakeTo;
+    return this.awakeFrom < this.awakeTo
+      ? m >= this.awakeFrom && m <= this.awakeTo
+      : m >= this.awakeFrom || m <= this.awakeTo;
   }
 
   /** First awake minute at or after t. */
   nextAwake(t: number): number {
     if (this.isAwake(t)) return t;
-    let n = t + ((this.awakeFrom - this.minuteOfDay(t) + DAY) % DAY);
-    // DST shifts can move the target by up to an hour either way.
-    if (!this.isAwake(n)) n -= HOUR;
-    while (!this.isAwake(n)) n += 1;
-    return n;
+    return this.seek(t + ((this.awakeFrom - this.minuteOfDay(t) + DAY) % DAY), true);
+  }
+
+  /** First asleep minute at or after t (Infinity when always awake). */
+  nextAsleep(t: number): number {
+    if (!this.isAwake(t)) return t;
+    if (this.alwaysAwake) return Infinity;
+    return this.seek(t + ((this.awakeTo + 1 - this.minuteOfDay(t) + DAY) % DAY), false);
+  }
+
+  /** Nudge a computed boundary onto the first minute with the wanted state (DST can shift it ±1 h). */
+  private seek(n: number, awake: boolean): number {
+    if (this.isAwake(n) !== awake) n -= HOUR;
+    for (let i = 0; i <= 3 * HOUR; i++, n++) if (this.isAwake(n) === awake) return n;
+    throw new Error("Could not find the next awake/asleep boundary; check the awake window.");
   }
 
   dayKey(t: number): string {

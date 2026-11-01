@@ -139,6 +139,8 @@ export function resolveConfig(user: any): Config {
     value: { ...DEFAULTS.value, ...user.value },
     goldPass: user.goldPass === null ? null : { ...DEFAULTS.goldPass!, ...user.goldPass },
   };
+  for (const t of [cfg.awake.from, cfg.awake.to])
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) throw new Error(`Awake times must be HH:MM, got "${t}"`);
   for (const c of cfg.exclude.categories)
     if (!(CATEGORIES as readonly string[]).includes(c))
       throw new Error(`Unknown category "${c}". Valid: ${CATEGORIES.join(", ")}`);

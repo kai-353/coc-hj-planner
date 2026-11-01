@@ -25,6 +25,48 @@ describe("Clock", () => {
   });
 });
 
+describe("Clock with an awake window past midnight (09:00 until 01:00)", () => {
+  const clock = new Clock("Europe/Amsterdam", 9 * 60, 60);
+  // Amsterdam is UTC+1 in November.
+  const at = (utc: string) => parseIso(`2026-11-02T${utc}:00Z`);
+
+  test("awake late evening and just after midnight, asleep in the early morning", () => {
+    expect(clock.isAwake(at("08:00"))).toBe(true); // 09:00
+    expect(clock.isAwake(at("22:30"))).toBe(true); // 23:30
+    expect(clock.isAwake(parseIso("2026-11-03T00:00:00Z"))).toBe(true); // 01:00
+    expect(clock.isAwake(parseIso("2026-11-03T00:01:00Z"))).toBe(false); // 01:01
+    expect(clock.isAwake(at("07:59"))).toBe(false); // 08:59
+  });
+
+  test("next awake / asleep moments", () => {
+    expect(clock.nextAwake(at("03:00"))).toBe(at("08:00"));
+    expect(clock.nextAsleep(at("19:00"))).toBe(parseIso("2026-11-03T00:01:00Z"));
+  });
+
+  test("equal times mean always awake", () => {
+    const always = new Clock("Europe/Amsterdam", 9 * 60, 9 * 60);
+    expect(always.isAwake(at("03:00"))).toBe(true);
+    expect(always.nextAsleep(at("03:00"))).toBe(Infinity);
+  });
+
+  test("a plan with that window completes and acts only while awake", () => {
+    const plan = makePlan(
+      {
+        ...DEFAULTS,
+        village: "",
+        awake: { from: "09:00", to: "01:00" },
+        inventory: { builderPotion: 4, researchPotion: 1, gems: 5751, leagueMedals: 2345, raidMedals: 3356 },
+        exclude: { categories: ["siege-machines", "supercharges", "guardians"], names: [] },
+      },
+      village,
+      catalog,
+    );
+    for (const q of QUEUES)
+      for (const e of plan.results[q].events) if (e.kind !== "finish") expect(plan.clock.isAwake(e.t)).toBe(true);
+    expect(QUEUES.some((q) => plan.results[q].events.some((e) => e.kind !== "finish" && plan.clock.minuteOfDay(e.t) < 60))).toBe(true);
+  });
+});
+
 describe("village", () => {
   test("parses the export", () => {
     expect(village.townHall).toBe(18);

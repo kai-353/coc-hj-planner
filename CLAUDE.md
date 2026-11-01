@@ -25,6 +25,8 @@ Runtime is **Bun** (Node is not installed): `bun run dev` (web app), `bun run pl
 - Max the base during Hammer Jam while spending as few special items as possible.
 - Builders and the lab should never sit idle: upgrades should finish between **09:00 and 23:00
   Europe/Amsterdam**, and every action (start, potion, helper) happens inside that window.
+  The awake window is configurable and may cross midnight (e.g. awake 09:00 until 01:00); equal
+  times mean always awake. All awake/asleep logic goes through `Clock` in `src/time.ts`.
 - **Builders and lab must be free when Hammer Jam ends** (configurable `freeBy`, default = event end)
   so the user can start TH19 and its new upgrades right away: every upgrade must *finish* by then,
   not just start. An upgrade only starts if it finishes by `freeBy` at normal speed.
