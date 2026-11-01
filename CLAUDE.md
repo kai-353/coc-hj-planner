@@ -1,0 +1,76 @@
+# coc-hj-planner
+
+Hammer Jam upgrade scheduler for Clash of Clans (see README.md for usage and architecture).
+Runtime is **Bun** (Node is not installed): `bun run plan`, `bun test`, `bunx tsc --noEmit -p .`.
+
+## User goals and preferences
+
+- Max the base during Hammer Jam while spending as few special items as possible.
+- Builders, lab and pet house should never sit idle: upgrades should finish between **09:00 and 23:00
+  Europe/Amsterdam**, and every action (start, potion, helper) happens inside that window.
+- **Books and hammers are saved for the TH19 release.** Never use them by default (`neverUse`).
+- **Gems are not for finishing upgrades.** They are only for the Goblin Builder / Goblin Researcher.
+- Exclude non-permanent upgrades: crafted defenses are always skipped (they rotate each crafting season).
+- Storage caps of magic items don't matter for planning.
+- **Pets are not planned.** The only speed-up is pet potions (bought with gems, a few from the Raid
+  Medal Trader), so there is nothing to optimise. Pet upgrades are skipped with "pets aren't planned".
+- The user wants to choose categories to skip (e.g. siege machines, supercharges, which in-game are
+  also called "overclocks").
+
+## Hammer Jam
+
+- 2026 edition: **1 Nov – 16 Nov 08:00 GMT** (= 09:00 Amsterdam). With a 23:00 bedtime, the last
+  practical start is Sun 15 Nov 23:00.
+- Home Village upgrades paid with Gold, Elixir or Dark Elixir cost **50% less and take 50% less time**
+  (TH3+). This covers buildings, traps, heroes, guardians, lab research, pets and supercharges.
+- The discount is locked in **when an upgrade starts**. Starting before the end is what matters; it may
+  finish after the event. So the longest upgrades go last, one per builder.
+- Upgrades already running when the event starts keep their old (full) timer.
+
+## Magic items, helpers and boosts
+
+| Item | Effect | Notes / prices (configurable, verify in game) |
+|---|---|---|
+| Builder Potion | All builders 10× speed for 1 h → each busy builder gains 9 h | League Shop 30 medals; ~285 gems |
+| Research Potion | Lab 24× for 1 h → +23 h | League Shop 20 medals; Raid Trader 200 raid medals; ~120 gems |
+| Pet Potion | Pet House 24× for 1 h → +23 h | Raid Trader 200 raid medals; ~120 gems |
+| Book of Building / Fighting / Spells / Heroes | Instantly finish an *ongoing* upgrade of that type (Heroes also covers pets) | 925 / 925 / 925 / 500 gems. Saved for TH19. |
+| Book of Everything | Finish any ongoing upgrade | Not purchasable. Saved for TH19. |
+| Hammer of Building / Fighting / Spells / Heroes | Upgrade one item one level instantly, no builder or resources | League Shop 120 (Heroes 165) medals, 7-day cooldown. Saved for TH19. |
+| Builder's Apprentice (helper) | Lvl N adds N h of progress to one builder upgrade during 1 h; ~23 h cooldown | Export: helper `93000000`, `helper_cooldown` in seconds |
+| Lab Assistant (helper) | Same for research | Export: helper `93000001` |
+| Goblin Builder / Goblin Researcher | Extra temporary builder / researcher, **40 gems per day** of upgrade time | In the lab this doubles throughput on top of the halved times (4× normal pace) |
+| Gem finishing | 1 min = 1 gem, 1 h = 20, 1 d = 260, 7 d = 1000 (interpolated) | `calculators().gems().cost()` in the package. Not used, per user preference. |
+
+Assumptions in the model that are worth verifying in game: potions also speed up the goblin's upgrade;
+the Apprentice/Assistant can't be put on the goblin's upgrade; the helper cooldown is 23 h.
+
+## Village export format (`base_export_*.json`)
+
+- `timestamp`: Unix seconds of the export. `buildings`, `traps`, `units` (troops), `spells`,
+  `siege_machines`, `heroes`, `pets`, `guardians`: entries `{ data: <id>, lvl, cnt? }`.
+  Fields ending in `2` (`buildings2`, …) are the Builder Base, which is ignored here.
+- `cnt` groups identical instances. An entry with `timer` (seconds left) is one instance that is currently
+  upgrading from `lvl` to `lvl + 1`. It's listed separately from the `cnt` group.
+- `extra: true` means the upgrade runs on the Goblin Builder/Researcher. `helper_recurrent: true` means
+  the Builder's Apprentice is assigned to it.
+- `gear_up: 1` marks a geared-up building. Supercharge levels are probably a `supercharge` field
+  (not seen in an export yet).
+- Crafting Station (`1000097`) has `types[].modules[]` with module ids (`102000xxx`).
+- `helpers`: `93000000` Builder's Apprentice, `93000001` Lab Assistant, `93000002` Prospector,
+  `93000003` Alchemist. `boosts.lab_boost` / `clocktower_cooldown` are seconds.
+- Walls (`1000010`) take no builder time, so they're listed separately in the report.
+- Builder count = Builder's Huts (`1000015`, `cnt`) + 1 if B.O.B's Hut (`1000064`) exists.
+- `coc_mapping.json` maps ids to names (hand-made; the package is the source of truth).
+
+## `clash-of-clans-data` package
+
+- Data files live at `node_modules/clash-of-clans-data/data/home/<category>/<name>.json` and are keyed
+  by `dataId` (same ids as the export). `src/catalog.ts` reads them directly because the query API
+  doesn't expose every namespace uniformly.
+- Levels have `buildTime|upgradeTime|researchTime` (`{days,hours,minutes,seconds}`), matching cost
+  fields, and `townHallRequired`, `laboratoryRequired`, `petHouseLevelRequired`, `heroHallLevelRequired`.
+- **Supercharge levels** are appended after the normal levels with `supercharge: true`, numbered from 1
+  again. They require the building at max normal level and TH18.
+- Crafted defenses: `modules[].upgrades[]` with module `dataId`s. `availablePerTownHall` gives counts,
+  with `countAfterMerges` for merged buildings.

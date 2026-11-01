@@ -1,0 +1,20 @@
+{
+  "name": "coc-hj-planner",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest",
+    "shadcn": "^4.23.0"
+  },
+  "peerDependencies": {
+    "typescript": "^7"
+  },
+  "dependencies": {
+    "clash-of-clans-data": "0.19.1"
+  },
+  "scripts": {
+    "plan": "bun src/cli.ts",
+    "typecheck": "tsc --noEmit"
+  }
+}
