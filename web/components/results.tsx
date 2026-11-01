@@ -460,6 +460,7 @@ function Resources({ plan }: { plan: PlanView }) {
                     <span className="font-medium tabular-nums">{fmtNum(w.count * w.costEach)}</span>
                     <span className="block text-xs text-muted-foreground">
                       {w.resource} · {fmtNum(w.costEach)} each
+                      {w.goldPassReduction > 0 && ` · with ${Math.round(w.goldPassReduction * 100)}% Gold Pass boost`}
                     </span>
                   </span>
                 </li>

@@ -188,6 +188,12 @@ describe("shop limits and potions", () => {
     expect(Object.fromEntries(view.resources.map((r) => [r.resource, r.amount]))).toEqual(Object.fromEntries(expected));
   });
 
+  test("walls get the event discount and the best Gold Pass builder boost", () => {
+    const w = plan.walls.find((x) => x.level === 18)!;
+    expect(w.goldPassReduction).toBe(0.2);
+    expect(w.costEach).toBe(10_000_000 * 0.5 * 0.8);
+  });
+
   test("owned items are used before buying the same item", () => {
     for (const key of ["builderPotion", "researchPotion"] as const) {
       const bought = plan.acquisitions.some((a) => a.item === key && a.source !== "owned");

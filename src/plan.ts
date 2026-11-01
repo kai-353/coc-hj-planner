@@ -72,8 +72,19 @@ export interface Plan {
   ownedUsed: Partial<Record<ItemKey, number>>;
   /** Extra purchases that would be needed to start everything, if the budget falls short. */
   shortfall?: { acquisitions: Acquisition[]; spent: Record<Currency, number>; stillUnstarted: number };
-  /** Walls below max, with the discounted cost of upgrading each one to max (Gold or Elixir). */
-  walls: { level: number; count: number; maxLevel: number; costEach: number; resource: string }[];
+  /**
+   * Walls below max, with the cost of upgrading each one to max (Gold or Elixir): event price minus the
+   * best Gold Pass builder boost, assuming they're done once that tier is active.
+   */
+  walls: {
+    level: number;
+    count: number;
+    maxLevel: number;
+    costEach: number;
+    resource: string;
+    /** Gold Pass builder boost included in costEach (0 without a Gold Pass). */
+    goldPassReduction: number;
+  }[];
 }
 
 export function makePlan(config: Config, village: Village, catalog: Catalog): Plan {
@@ -158,11 +169,16 @@ export function makePlan(config: Config, village: Village, catalog: Catalog): Pl
       .map((w) => {
         const maxLevel = catalog.maxLevelAt(WALL_ID, village.townHall);
         const steps = catalog.get(WALL_ID)!.levels.filter((l) => l.level > w.level && l.level <= maxLevel);
+        const goldPassReduction = goldPass ? Math.max(0, ...goldPass.builder.map((t) => t.reduction)) : 0;
         return {
           ...w,
           maxLevel,
-          costEach: steps.reduce((a, l) => a + Math.round(l.cost * config.event.discount), 0),
+          costEach: steps.reduce(
+            (a, l) => a + Math.round(l.cost * config.event.discount * (1 - goldPassReduction)),
+            0,
+          ),
           resource: steps.at(-1)?.resource ?? "",
+          goldPassReduction,
         };
       })
       .filter((w) => w.level < w.maxLevel),

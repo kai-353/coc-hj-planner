@@ -105,7 +105,9 @@ the Apprentice/Assistant can't be put on the goblin's upgrade; the helper cooldo
 - Crafting Station (`1000097`) has `types[].modules[]` with module ids (`102000xxx`).
 - `helpers`: `93000000` Builder's Apprentice, `93000001` Lab Assistant, `93000002` Prospector,
   `93000003` Alchemist. `boosts.lab_boost` / `clocktower_cooldown` are seconds.
-- Walls (`1000010`) take no builder time, so they're listed separately in the report.
+- Walls (`1000010`) take no builder time, so they're listed separately in the report. They can be
+  paid with Gold or Elixir, get the Hammer Jam discount, and the Gold Pass builder boost (cost) also
+  applies; walls are costed optimistically at the best builder tier (20%).
 - Builder count = Builder's Huts (`1000015`, `cnt`) + 1 if B.O.B's Hut (`1000064`) exists.
 - `coc_mapping.json` maps ids to names (hand-made; the package is the source of truth).
 

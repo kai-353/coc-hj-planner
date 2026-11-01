@@ -96,7 +96,7 @@ export function renderMarkdown(v: PlanView): string {
     line();
     for (const w of v.walls)
       line(
-        `- ${w.count}× level ${w.level} → ${w.maxLevel}: ${fmtNum(w.count * w.costEach)} ${w.resource} (${fmtNum(w.costEach)} each, discounted)`,
+        `- ${w.count}× level ${w.level} → ${w.maxLevel}: ${fmtNum(w.count * w.costEach)} ${w.resource} (${fmtNum(w.costEach)} each${w.goldPassReduction ? `, with the ${Math.round(w.goldPassReduction * 100)}% Gold Pass builder boost: upgrade them once it's active` : ""})`,
       );
     line();
   }
