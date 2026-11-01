@@ -175,7 +175,9 @@ export function makePlan(config: Config, village: Village, catalog: Catalog): Pl
   return plan;
 }
 
-const totalUnstarted = (r: Record<PlanQueue, SimResult>) => QUEUES.reduce((a, q) => a + r[q].unstartedMin, 0);
+/** Upgrade time not done in time: never started, or (with a free-by time) finishing too late. */
+const totalUnstarted = (r: Record<PlanQueue, SimResult>) =>
+  QUEUES.reduce((a, q) => a + r[q].unstartedMin + r[q].lateMin, 0);
 /** Upgrade time cleared before the event ends: timer progress plus upgrades finished instantly. */
 const totalWork = (r: Record<PlanQueue, SimResult>) =>
   QUEUES.reduce((a, q) => a + r[q].workBeforeEnd + r[q].instantMin, 0);

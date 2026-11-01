@@ -181,3 +181,23 @@ describe("shop limits and potions", () => {
     expect(names.has("Elixir Storage")).toBe(true);
   });
 });
+
+describe("free-by with potions still to come", () => {
+  test("long research can start late when potions will finish it in time (21:44 export)", async () => {
+    const later = parseVillage(await Bun.file(`${import.meta.dir}/../base_export_26-11-01-2.json`).json(), catalog);
+    const plan = makePlan(
+      {
+        ...DEFAULTS,
+        village: "",
+        inventory: { builderPotion: 4, researchPotion: 1, gems: 5751, leagueMedals: 2345, raidMedals: 3356 },
+        exclude: { categories: ["siege-machines", "supercharges", "guardians"], names: [] },
+      },
+      later,
+      catalog,
+    );
+    for (const q of QUEUES) {
+      expect(plan.results[q].unstarted).toEqual([]);
+      expect(plan.results[q].lateMin).toBe(0);
+    }
+  });
+});

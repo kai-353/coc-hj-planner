@@ -88,6 +88,8 @@ export interface SimResult {
   startedAt: Map<string, number>;
   unstarted: Task[];
   unstartedMin: number;
+  /** Upgrade time (of started upgrades) that finishes after the free-by time; counts as not done. */
+  lateMin: number;
   /** Progress made while the player can still act, in full-price minutes (so later, more discounted
    * upgrades count for more per timer minute). */
   workBeforeEnd: number;
@@ -126,6 +128,7 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
   const doneAt = new Map<string, number>();
   const startedAt = new Map<string, number>();
   const ids = new Set(cfg.tasks.map((t) => t.id));
+  const taskById = new Map(cfg.tasks.map((t) => [t.id, t]));
   const pending = new Set<Task>();
   const slots: Slot[] = Array.from({ length: cfg.slots }, (_, i) => ({ id: i + 1, temp: false, goblin: false, rem: 0, scale: 1 }));
   const goblinSlot: Slot | undefined = cfg.goblin ? { id: GOBLIN_SLOT, temp: false, goblin: true, rem: 0, scale: 1 } : undefined;
@@ -223,8 +226,10 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
   };
 
   const choose = (t: number, candidates: Task[], res: Set<Task>): Task | undefined => {
-    // Only upgrades that finish by the free-by time at normal speed (potions only make them earlier).
-    const avail = candidates.filter((x) => t + durAt(x, t) <= cfg.freeBy);
+    // Only upgrades that can finish by the free-by time. Potions still to come count: each one moves
+    // every running upgrade forward, and a late finish forces them to be drunk (see below).
+    const credit = potionQueue.filter((p) => p.availableAt < lastAction).length * (M - 1) * HOUR;
+    const avail = candidates.filter((x) => t + durAt(x, t) - credit <= cfg.freeBy);
     if (!avail.length) return undefined;
     // An upgrade only "fits" if the slot frees up while the player can still start the next one.
     const fits = avail.filter((x) => !res.has(x) && t + durAt(x, t) <= lastAction);
@@ -291,13 +296,16 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
       const used = alloc.potions.length - potionQueue.length;
       const due = Math.ceil((alloc.potions.length * (t - start)) / (lastAction - start)) - used;
       const finalDay = lastAction - t < DAY;
-      let best: { k: number; per: number } | undefined;
+      // An upgrade that would finish after the free-by time gets the potions it needs right away.
+      const overrun = Math.max(0, ...busy.map((s) => t + s.rem - cfg.freeBy));
+      const forced = overrun > 0 ? Math.min(ready, Math.ceil(overrun / ((M - 1) * HOUR))) : 0;
+      let best: { k: number; per: number } | undefined = forced ? { k: forced, per: Infinity } : undefined;
       for (let k = 1; k <= Math.min(ready, MAX_BATCH); k++) {
         const v = batchValue(t, k, busy, boostable);
         const ok =
           (v.idleSaved > 0 && v.efficiency >= 0.6) ||
           (v.idleSaved >= 0 && k <= Math.max(due, finalDay ? ready : 0) && v.efficiency >= (finalDay ? 0.5 : 0.85));
-        if (ok && (!best || v.efficiency > best.per + 1e-9)) best = { k, per: v.efficiency };
+        if (ok && !forced && (!best || v.efficiency > best.per + 1e-9)) best = { k, per: v.efficiency };
       }
       const k = best?.k ?? 0;
       if (k) {
@@ -384,6 +392,9 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
     startedAt,
     unstarted,
     unstartedMin: unstarted.reduce((a, x) => a + x.durMin, 0),
+    lateMin: [...doneAt, ...projectedDone]
+      .filter(([, at]) => at > cfg.freeBy)
+      .reduce((a, [id]) => a + (taskById.get(id)?.durMin ?? 0), 0),
     workBeforeEnd: work,
     instantMin,
     idleAwakeMin: idleAwake,

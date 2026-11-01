@@ -1,12 +1,12 @@
 {
-  "village": "base_export_26-11-01.json",
+  "village": "base_export_26-11-01-2.json",
   "timezone": "Europe/Amsterdam",
   "awake": { "from": "09:00", "to": "23:00" },
   "event": { "start": "2026-11-01T08:00:00Z", "end": "2026-11-16T08:00:00Z", "discount": 0.5 },
   "inventory": {
     "builderPotion": 4,
     "researchPotion": 1,
-    "gems": 6011,
+    "gems": 5751,
     "leagueMedals": 2345,
     "raidMedals": 3356
   },
