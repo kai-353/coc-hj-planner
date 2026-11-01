@@ -446,7 +446,8 @@ function Resources({ plan }: { plan: PlanView }) {
       <Card>
         <CardHeader>
           <CardTitle>Walls</CardTitle>
-          <CardDescription>Instant, no builder needed. Do them while costs are discounted.</CardDescription>
+          <CardDescription>Instant, no builder needed. Do them while costs are discounted. 
+                    {plan.walls.length && plan.walls[0].goldPassReduction > 0 && ` Calculated with a ${Math.round(plan.walls[0].goldPassReduction * 100)}% Gold Pass boost.`}</CardDescription>
         </CardHeader>
         <CardContent>
           {plan.walls.length ? (
@@ -465,8 +466,7 @@ function Resources({ plan }: { plan: PlanView }) {
                     </span>
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {w.resource} · {fmtNum(w.costEach)} each
-                    {w.goldPassReduction > 0 && ` · with ${Math.round(w.goldPassReduction * 100)}% Gold Pass boost`}
+                    {fmtNum(w.costEach)} each
                   </div>
                 </li>
               ))}
