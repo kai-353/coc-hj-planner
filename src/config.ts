@@ -23,6 +23,8 @@ export interface ShopOffer {
   price: number;
   /** Max purchases during the plan (omit for unlimited). */
   limit?: number;
+  /** Max purchases per shop week (see `shopWeekReset`). */
+  limitPerWeek?: number;
   /** Days between purchases (League Shop hammers: 7). */
   cooldownDays?: number;
 }
@@ -44,6 +46,8 @@ export interface Config {
   /** How "expensive" each special item is to spend, in gem-equivalents. The planner minimises the total. */
   value: Partial<Record<ItemKey | Currency, number>>;
   shop: ShopOffer[];
+  /** Any moment the weekly shop limits reset (the Trader refreshes Tuesdays 08:00 UTC). */
+  shopWeekReset: string;
   helperCooldownHours: number;
 }
 
@@ -85,12 +89,13 @@ export const DEFAULTS: Omit<Config, "village"> = {
   shop: [
     { item: "builderPotion", currency: "leagueMedals", price: 30 },
     { item: "researchPotion", currency: "leagueMedals", price: 20 },
-    { item: "researchPotion", currency: "raidMedals", price: 200 },
+    { item: "researchPotion", currency: "raidMedals", price: 200, limitPerWeek: 3 },
     { item: "hammerOfBuilding", currency: "leagueMedals", price: 120, cooldownDays: 7 },
     { item: "hammerOfFighting", currency: "leagueMedals", price: 120, cooldownDays: 7 },
     { item: "hammerOfSpells", currency: "leagueMedals", price: 120, cooldownDays: 7 },
     { item: "hammerOfHeroes", currency: "leagueMedals", price: 165, cooldownDays: 7 },
   ],
+  shopWeekReset: "2026-11-03T08:00:00Z",
   helperCooldownHours: 23,
 };
 

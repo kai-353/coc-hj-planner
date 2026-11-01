@@ -177,7 +177,7 @@ function toAlloc(acqs: Acquisition[], queue: PlanQueue): Alloc {
     }
     const info = ITEMS[a.item];
     if (info.kind === "potion") {
-      alloc.potions.push({ item: a.item, label: info.label, source: a.source });
+      alloc.potions.push({ item: a.item, label: info.label, source: a.source, availableAt: a.availableAt });
     } else {
       const classes = new Set(info.classes);
       alloc.tokens.push({
@@ -229,6 +229,11 @@ function optimize(
     );
   };
 
+  const limitedOffer = (a: Acquisition) =>
+    config.shop.some(
+      (o) => o.item === a.item && o.currency === a.source && (o.limitPerWeek || o.cooldownDays || o.limit != null),
+    );
+
   // Candidate acquisitions for a queue, cheapest source per item/availability.
   const candidates = (queue: PlanQueue): Acquisition[] => {
     const out: Acquisition[] = [];
@@ -245,7 +250,13 @@ function optimize(
         if (offer.item !== item) continue;
         const bought = acqs.filter((a) => a.item === item && a.source === offer.currency).length;
         if (offer.limit != null && bought >= offer.limit) continue;
-        const availableAt = start + bought * (offer.cooldownDays ?? 0) * DAY;
+        let availableAt = start + bought * (offer.cooldownDays ?? 0) * DAY;
+        if (offer.limitPerWeek) {
+          // The n-th purchase has to wait for the shop week it falls in.
+          const anchor = parseIso(config.shopWeekReset);
+          const currentWeek = anchor + Math.floor((start - anchor) / (7 * DAY)) * 7 * DAY;
+          availableAt = Math.max(availableAt, currentWeek + Math.floor(bought / offer.limitPerWeek) * 7 * DAY);
+        }
         if (availableAt >= simConfigs[queue].end) continue;
         opts.push({
           item,
@@ -270,9 +281,11 @@ function optimize(
     for (const queue of QUEUES) {
       if (results[queue].unstartedMin <= 0) continue;
       for (const acq of candidates(queue)) {
-        // Timing effects make single items noisy (one potion can shift finishes into the night),
-        // so also try small batches of the same item.
-        for (let k = 1; k <= (acq.source === "owned" || acq.availableAt === start ? 3 : 1); k++) {
+        // Timing effects make single items noisy (one potion can shift finishes into the night) and
+        // progress has plateaus, so also try batches of the same item.
+        // Items with weekly limits or cooldowns get different availability per copy, so only batch the rest.
+        const repeatable = acq.source === "owned" || !limitedOffer(acq);
+        for (const k of repeatable ? [1, 2, 3, 5, 8, 13] : [1]) {
           const batch = Array.from({ length: k }, () => ({ ...acq }));
           const trial = [...acqs, ...batch];
           const r = simulateAll(simConfigs, trial);

@@ -22,7 +22,7 @@
     "hammerOfSpells"
   ],
   "exclude": {
-    "categories": ["siege-machines", "supercharges"],
+    "categories": ["siege-machines", "supercharges", "guardians"],
       "names": ["cloneSpell", "recallSpell", "earthquakeSpell", "batSpell"]
   }
 }

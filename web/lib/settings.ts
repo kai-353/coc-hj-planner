@@ -24,7 +24,7 @@ export function defaultSettings(meta: Meta): Settings {
   return {
     inventory: {},
     allowedItems: [],
-    excludeCategories: ["siege-machines", "supercharges"],
+    excludeCategories: ["siege-machines", "supercharges", "guardians"],
     excludeNames: "",
     awakeFrom: meta.defaults.awake.from,
     awakeTo: meta.defaults.awake.to,

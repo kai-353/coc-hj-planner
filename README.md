@@ -46,10 +46,11 @@ bun test
 | `inventory` | Owned items plus `gems`, `leagueMedals`, `raidMedals`. Item keys: `builderPotion`, `researchPotion`, `bookOfBuilding`, `bookOfHeroes`, `bookOfFighting`, `bookOfSpells`, `bookOfEverything`, `hammerOfBuilding`, `hammerOfHeroes`, `hammerOfFighting`, `hammerOfSpells` |
 | `neverUse` | Items never used or bought. Defaults to all books and hammers (saved for the next Town Hall). |
 | `exclude.categories` | Any of `town-hall`, `defenses`, `traps`, `resources`, `army`, `other`, `guardians`, `heroes`, `troops`, `spells`, `siege-machines`, `supercharges` |
-| `exclude.names` | Substrings of names to skip, e.g. `"Gold Storage"` |
+| `exclude.names` | Names to skip, e.g. `"Gold Storage"` (case, spaces and punctuation are ignored) |
 | `goblinGemsPerDay` | Goblin Builder / Researcher price (40 gems per day of upgrade time); `null` disables them |
 | `value` | Gem-equivalent "price" of each item/currency. The planner minimises the total value spent. |
-| `shop` | What can be bought, where and for how much (League Shop / Raid Medal Trader) |
+| `shop` | What can be bought, where and for how much (League Shop / Raid Medal Trader), with optional `limit`, `limitPerWeek` and `cooldownDays` |
+| `shopWeekReset` | Any moment the weekly shop limits reset (Trader: Tuesdays 08:00 UTC) |
 | `builders` | Override the builder count (default: Builder's Huts + B.O.B) |
 
 Crafted defenses are always skipped because they're replaced each crafting season.

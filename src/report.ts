@@ -12,7 +12,7 @@ function rowText(r: ScheduleRow): string {
     case "overnight":
       return `⚠ ${r.actor}: ${taskName(r.task)} finishes overnight`;
     case "potion":
-      return `🧪 Drink **${r.item}** (${r.source})`;
+      return `🧪 Drink **${r.count}× ${r.item}** (${r.sources}), boost until ${r.until}`;
     case "helper":
       return `👷 Assign ${r.helper} to ${taskName(r.task)}`;
     case "hammer":
@@ -57,12 +57,17 @@ export function renderMarkdown(v: PlanView): string {
   if (v.shortfall) {
     line(`### Not enough to start everything`);
     line();
-    line(`With unlimited gems and medals (still never using the items above), you would additionally need:`);
-    line();
-    for (const i of v.shortfall.items) line(`- ${i.count}× ${i.label}`);
-    line(
-      `- Total spend would be ${spentText(v.shortfall.spent)}${v.shortfall.stillUnstartedMin ? ` (still ${fmtDuration(v.shortfall.stillUnstartedMin)} of upgrades not started)` : ""}`,
-    );
+    if (!v.shortfall.items.length) {
+      line(`More gems or medals wouldn't help: the upgrades below can't start in time, usually because they`);
+      line(`wait for earlier levels of the same building. Consider skipping them or unlocking books/hammers.`);
+    } else {
+      line(`With unlimited gems and medals (still never using the items above), you would additionally need:`);
+      line();
+      for (const i of v.shortfall.items) line(`- ${i.count}× ${i.label}`);
+      line(
+        `- Total spend would be ${spentText(v.shortfall.spent)}${v.shortfall.stillUnstartedMin ? ` (still ${fmtDuration(v.shortfall.stillUnstartedMin)} of upgrades not started)` : ""}`,
+      );
+    }
     line();
   }
 

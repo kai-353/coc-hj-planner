@@ -5,7 +5,10 @@
 // - When picking an upgrade, prefer one that will finish inside the awake window and before the event
 //   ends; the longest remaining upgrades are kept for last because they may run past the event end
 //   (the discount is locked in when the upgrade starts).
-// - Potions multiply the speed of every busy slot for one hour; a helper (Builder's Apprentice /
+// - Potions multiply the speed of every busy slot for one hour each and stack: drinking k at once boosts
+//   for k hours. Batches are drunk at the end of the day so the boost runs while the player sleeps;
+//   daytime batches only happen when there are more potions than the remaining nights can absorb.
+// - A helper (Builder's Apprentice /
 //   Lab Assistant) adds `workRate` hours of progress to one regular slot for one hour, once per cooldown.
 // - The Goblin Builder / Goblin Researcher is an extra slot paid in gems per day of upgrade time; the
 //   allocation says how many upgrades it may take on.
@@ -27,6 +30,8 @@ export interface PotionUse {
   item: string;
   label: string;
   source: string;
+  /** When the potion can be had (shop purchases may have to wait for a weekly reset). */
+  availableAt: number;
 }
 
 export interface Alloc {
@@ -68,7 +73,7 @@ export const GOBLIN_SLOT = 0;
 export type SimEvent =
   | { t: number; kind: "start"; slot: number; task: Task; gems: number }
   | { t: number; kind: "finish"; slot: number; task: Task }
-  | { t: number; kind: "potion"; use: PotionUse }
+  | { t: number; kind: "potion"; uses: PotionUse[]; until: number }
   | { t: number; kind: "helper"; slot: number; task: Task; helper: string }
   | { t: number; kind: "instant"; token: Token; task: Task };
 
@@ -99,6 +104,9 @@ interface Slot {
   task?: Task;
   rem: number;
 }
+
+/** Potions per night that typically still land on running upgrades. */
+const NIGHT_BATCH = 3;
 
 const longest = (xs: Task[]) => xs.reduce((a, b) => (b.durMin > a.durMin ? b : a));
 
@@ -136,7 +144,7 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
   }
 
   const tokens = [...alloc.tokens].sort((a, b) => kindOrder(a) - kindOrder(b));
-  let potionsLeft = alloc.potions.length;
+  const potionQueue = [...alloc.potions].sort((a, b) => a.availableAt - b.availableAt);
   let goblinLeft = cfg.goblin ? alloc.goblinTasks : 0;
   let potionUntil = -1;
   let helperUntil = -1;
@@ -152,17 +160,62 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
   const isDone = (id: string, t: number) =>
     ((ids.has(id) ? doneAt.get(id) : cfg.externalDone?.get(id)) ?? Infinity) <= t;
   const available = (t: number) => [...pending].filter((x) => x.deps.every((d) => isDone(d, t)));
+  // Critical path: an upgrade's own time plus the longest chain of later levels waiting on it.
+  const dependents = new Map<string, Task[]>();
+  for (const x of cfg.tasks) for (const d of x.deps) dependents.set(d, [...(dependents.get(d) ?? []), x]);
+  const chainMin = new Map<string, number>();
+  const chain = (x: Task): number => {
+    let v = chainMin.get(x.id);
+    if (v === undefined) {
+      v = x.durMin + Math.max(0, ...(dependents.get(x.id) ?? []).map(chain));
+      chainMin.set(x.id, v);
+    }
+    return v;
+  };
+  const mostUrgent = (xs: Task[]) => xs.reduce((a, b) => (chain(b) > chain(a) ? b : a));
+
+  // Keep the longest stand-alone upgrades for each slot's last start (they may overrun the event).
   const reserved = () => {
+    const free = [...pending].filter((x) => !dependents.has(x.id));
     if (pending.size <= cfg.slots) return new Set<Task>();
-    return new Set([...pending].sort((a, b) => b.durMin - a.durMin).slice(0, cfg.slots));
+    return new Set(free.sort((a, b) => b.durMin - a.durMin).slice(0, cfg.slots));
   };
   const idleUntilMorning = (t: number) => clock.nextAwake(t) - t;
 
+  // Last moment the player can act before the event ends; progress after it can't start anything new.
+  let lastAction = end - 1;
+  while (lastAction > start && !clock.isAwake(lastAction)) lastAction--;
+
+  const isEvening = (t: number) => !clock.isAwake(t + HOUR);
+  /** Evenings (including this one) after which there is still an awake period before the event ends. */
+  const eveningsLeft = (t: number) => {
+    const days = Math.round((lastAction - clock.minuteOfDay(lastAction) - (t - clock.minuteOfDay(t))) / DAY);
+    return Math.max(0, days);
+  };
+
+  /** Share of a k-hour boost that turns into useful progress. */
+  const boostUse = (t: number, k: number, busy: Slot[], boostable: number) => {
+    const cap = M * k * HOUR;
+    let useful = 0;
+    for (const s of busy) {
+      if (s.rem >= cap) useful += cap;
+      // Finishing while awake is fine: the slot gets a new upgrade and keeps using the boost.
+      else useful += clock.isAwake(t + s.rem / M) ? cap : s.rem;
+    }
+    return useful / (boostable * cap);
+  };
+
+  const bestBatch = (t: number, max: number, minUse: number, busy: Slot[], boostable: number) => {
+    for (let k = max; k >= 1; k--) if (boostUse(t, k, busy, boostable) >= minUse) return k;
+    return 0;
+  };
+
   const choose = (t: number, avail: Task[], res: Set<Task>): Task | undefined => {
     if (!avail.length) return undefined;
-    const fits = avail.filter((x) => !res.has(x) && t + x.durMin <= end);
+    // An upgrade only "fits" if the slot frees up while the player can still start the next one.
+    const fits = avail.filter((x) => !res.has(x) && t + x.durMin <= lastAction);
     const good = fits.filter((x) => clock.isAwake(t + x.durMin));
-    if (good.length) return longest(good);
+    if (good.length) return mostUrgent(good);
     if (fits.length)
       return fits.reduce((a, b) => {
         const ia = idleUntilMorning(t + a.durMin);
@@ -213,27 +266,25 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
     const busy = slots.filter((s) => s.task);
     const regularFree = slots.some((s) => isRegular(s) && !s.task);
 
-    // Potions: drink when most of the boost lands on busy slots, and the shift doesn't push more
-    // finishes into the night than it pulls out.
-    if (potionsLeft > 0 && t >= potionUntil && busy.length) {
-      // Potions can only be drunk one per awake hour; only rush when that capacity is running out.
-      const awakeHoursLeft = ((end - t) / DAY) * ((clock.awakeTo - clock.awakeFrom) / HOUR);
-      const urgent = potionsLeft >= awakeHoursLeft * 0.5;
+    // Potions, drunk in batches (they stack). Evening batches bridge the night; spread what's left
+    // over the remaining evenings and only drink during the day when the nights can't absorb it all.
+    const ready = potionQueue.filter((p) => p.availableAt <= t).length;
+    if (ready > 0 && t >= potionUntil && t < lastAction && busy.length) {
       const boostable = slots.filter((s) => !s.temp && (s.task || !s.goblin)).length;
-      const useful = busy.reduce((a, s) => a + Math.min(s.rem, M * HOUR), 0) / (boostable * M * HOUR);
-      if (useful >= (urgent ? 0.3 : 0.8)) {
-        let score = 0;
-        for (const s of busy) {
-          const before = t + s.rem;
-          const after = s.rem >= M * HOUR ? before - (M - 1) * HOUR : t + s.rem / M;
-          if (before < end || after < end) score += (clock.isAwake(after) ? 1 : 0) - (clock.isAwake(before) ? 1 : 0);
-        }
-        if (urgent || score >= 0) {
-          const use = alloc.potions[alloc.potions.length - potionsLeft]!;
-          potionsLeft--;
-          potionUntil = t + HOUR;
-          events.push({ t, kind: "potion", use });
-        }
+      const evenings = eveningsLeft(t);
+      let k = 0;
+      if (isEvening(t) && evenings > 0) {
+        const target = Math.min(ready, Math.ceil(potionQueue.length / evenings));
+        k = bestBatch(t, target, 0.6, busy, boostable);
+      }
+      // Long overnight batches waste boost on upgrades that finish while asleep, so assume the
+      // remaining nights take a few potions each and drink the rest during the day.
+      const surplus = potionQueue.length - (evenings - (isEvening(t) ? 1 : 0)) * NIGHT_BATCH;
+      if (!k && surplus > 0) k = bestBatch(t, Math.min(ready, surplus), 0.8, busy, boostable);
+      if (k) {
+        const uses = potionQueue.splice(0, k);
+        potionUntil = t + k * HOUR;
+        events.push({ t, kind: "potion", uses, until: potionUntil });
       }
     }
 
@@ -279,7 +330,7 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
       if (s.task) {
         const progress = Math.min(s.rem, rate(s, t) * dt);
         s.rem -= progress;
-        work += progress;
+        if (t < lastAction) work += progress;
         if (s.rem <= 1e-9) {
           doneAt.set(s.task.id, next);
           events.push({ t: next, kind: "finish", slot: s.id, task: s.task });
@@ -310,7 +361,7 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
     idleAwakeMin: idleAwake,
     nightIdleMin: nightIdle,
     gemsSpent,
-    potionsUsed: alloc.potions.length - potionsLeft,
+    potionsUsed: alloc.potions.length - potionQueue.length,
     tokensUsed,
     goblinTasksUsed: (cfg.goblin ? alloc.goblinTasks : 0) - goblinLeft,
   };

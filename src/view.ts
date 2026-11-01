@@ -31,7 +31,7 @@ export type ScheduleRow = {
 } & (
   | { kind: "start"; actor: string; task: TaskRef; durMin: number; gems: number; doneAt: string | null }
   | { kind: "overnight"; actor: string; task: TaskRef }
-  | { kind: "potion"; item: string; source: string }
+  | { kind: "potion"; item: string; count: number; sources: string; until: string }
   | { kind: "helper"; helper: string; task: TaskRef }
   | { kind: "book" | "hammer"; item: string; task: TaskRef }
 );
@@ -139,14 +139,23 @@ export function buildPlanView(plan: Plan): PlanView {
         case "finish":
           if (!clock.isAwake(e.t)) rows.push({ ...base(e.t), kind: "overnight", actor: actor(e.slot), task: ref(e.task) });
           break;
-        case "potion":
+        case "potion": {
+          const bySource = new Map<string, number>();
+          for (const u of e.uses) {
+            const src = SOURCE_LABEL[u.source as keyof typeof SOURCE_LABEL];
+            bySource.set(src, (bySource.get(src) ?? 0) + 1);
+          }
           rows.push({
             ...base(e.t),
             kind: "potion",
-            item: e.use.label,
-            source: SOURCE_LABEL[e.use.source as keyof typeof SOURCE_LABEL],
+            item: e.uses[0]!.label,
+            count: e.uses.length,
+            sources:
+              bySource.size === 1 ? [...bySource.keys()][0]! : [...bySource].map(([s, n]) => `${n} ${s}`).join(", "),
+            until: clock.time(e.until),
           });
           break;
+        }
         case "helper":
           rows.push({ ...base(e.t), kind: "helper", helper: e.helper, task: ref(e.task) });
           break;

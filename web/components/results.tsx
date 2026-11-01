@@ -145,20 +145,29 @@ function Items({ plan }: { plan: PlanView }) {
             <AlertTriangle />
             <AlertTitle>Not everything starts before the event ends</AlertTitle>
             <AlertDescription>
-              <p>With unlimited gems and medals (books and hammers still locked) you would additionally need:</p>
-              <ul className="list-inside list-disc">
-                {plan.shortfall.items.map((i) => (
-                  <li key={i.label}>
-                    {i.count}× {i.label}
-                  </li>
-                ))}
-              </ul>
-              <p>
-                Total spend would be {plan.shortfall.spent.map((s) => `${fmtNum(s.amount)} ${s.label}`).join(", ")}
-                {plan.shortfall.stillUnstartedMin > 0 &&
-                  ` (still ${fmtDuration(plan.shortfall.stillUnstartedMin)} of upgrades not started)`}
-                .
-              </p>
+              {plan.shortfall.items.length === 0 ? (
+                <p>
+                  More gems or medals wouldn't help: the upgrades under "Not started" can't begin in time, usually
+                  because they wait for earlier levels of the same building. Skip them or unlock books/hammers.
+                </p>
+              ) : (
+                <>
+                  <p>With unlimited gems and medals (books and hammers still locked) you would additionally need:</p>
+                  <ul className="list-inside list-disc">
+                    {plan.shortfall.items.map((i) => (
+                      <li key={i.label}>
+                        {i.count}× {i.label}
+                      </li>
+                    ))}
+                  </ul>
+                  <p>
+                    Total spend would be {plan.shortfall.spent.map((s) => `${fmtNum(s.amount)} ${s.label}`).join(", ")}
+                    {plan.shortfall.stillUnstartedMin > 0 &&
+                      ` (still ${fmtDuration(plan.shortfall.stillUnstartedMin)} of upgrades not started)`}
+                    .
+                  </p>
+                </>
+              )}
             </AlertDescription>
           </Alert>
         )}
@@ -275,10 +284,17 @@ function Row({ row: r, past }: { row: ScheduleRow; past: boolean }) {
           </div>
         )}
         {r.kind === "potion" && (
-          <div>
-            Drink <span className="font-medium">{r.item}</span>{" "}
-            <span className="text-xs text-muted-foreground">({r.source})</span>
-          </div>
+          <>
+            <div>
+              Drink{" "}
+              <span className="font-medium">
+                {r.count}× {r.item}
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {r.sources} · boost until {r.until}
+            </div>
+          </>
         )}
         {r.kind === "helper" && (
           <div>

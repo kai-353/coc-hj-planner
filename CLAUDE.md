@@ -24,7 +24,8 @@ Runtime is **Bun** (Node is not installed): `bun run dev` (web app), `bun run pl
 - **Pets are not planned.** The only speed-up is pet potions (bought with gems, a few from the Raid
   Medal Trader), so there is nothing to optimise. Pet upgrades are skipped with "pets aren't planned".
 - The user wants to choose categories to skip (e.g. siege machines, supercharges, which in-game are
-  also called "overclocks").
+  also called "overclocks"). Name exclusions match entity names ignoring case/spaces/punctuation
+  ("cloneSpell" = "Clone Spell").
 
 ## Hammer Jam
 
@@ -41,7 +42,7 @@ Runtime is **Bun** (Node is not installed): `bun run dev` (web app), `bun run pl
 | Item | Effect | Notes / prices (configurable, verify in game) |
 |---|---|---|
 | Builder Potion | All builders 10× speed for 1 h → each busy builder gains 9 h | League Shop 30 medals; ~285 gems |
-| Research Potion | Lab 24× for 1 h → +23 h | League Shop 20 medals; Raid Trader 200 raid medals; ~120 gems |
+| Research Potion | Lab 24× for 1 h → +23 h | League Shop 20 medals; Raid Trader 200 raid medals (**max 3 per week**); ~120 gems |
 | Pet Potion | Pet House 24× for 1 h → +23 h | Raid Trader 200 raid medals; ~120 gems |
 | Book of Building / Fighting / Spells / Heroes | Instantly finish an *ongoing* upgrade of that type (Heroes also covers pets) | 925 / 925 / 925 / 500 gems. Saved for TH19. |
 | Book of Everything | Finish any ongoing upgrade | Not purchasable. Saved for TH19. |
@@ -50,6 +51,15 @@ Runtime is **Bun** (Node is not installed): `bun run dev` (web app), `bun run pl
 | Lab Assistant (helper) | Same for research | Export: helper `93000001` |
 | Goblin Builder / Goblin Researcher | Extra temporary builder / researcher, **40 gems per day** of upgrade time | In the lab this doubles throughput on top of the halved times (4× normal pace) |
 | Gem finishing | 1 min = 1 gem, 1 h = 20, 1 d = 260, 7 d = 1000 (interpolated) | `calculators().gems().cost()` in the package. Not used, per user preference. |
+
+- **Potions stack**: drinking k at once extends the boost to k hours. The planner schedules batches
+  ("Drink 3× Builder Potion at 23:00") and prefers the last awake moment of the day, so the boost runs
+  while the player sleeps. Boost on an upgrade that finishes while asleep is wasted.
+- The Raid Medal Trader's weekly limits reset **Tuesdays 08:00 UTC** (`shopWeekReset`, `limitPerWeek`).
+- Nothing can start after the last awake moment before the event ends, so progress after it doesn't
+  help; an upgrade only "fits" if it ends before that moment.
+- Upgrade chains (e.g. a guardian's 4 levels) are scheduled by critical path so they start early.
+- The user doesn't care about guardians (excluded in their config).
 
 Assumptions in the model that are worth verifying in game: potions also speed up the goblin's upgrade;
 the Apprentice/Assistant can't be put on the goblin's upgrade; the helper cooldown is 23 h.

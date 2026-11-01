@@ -53,10 +53,13 @@ const isExcluded = (inst: Instance, sc: boolean, o: TaskOptions) => {
   if (inst.entity.category === "crafted-defenses") return "not permanent";
   if (o.excludeCategories.has(inst.entity.category)) return `category ${inst.entity.category}`;
   if (sc && o.excludeCategories.has("supercharges")) return "category supercharges";
-  const name = inst.entity.name.toLowerCase();
-  const hit = o.excludeNames.find((n) => name.includes(n.toLowerCase()));
-  return hit ? `name "${hit}"` : undefined;
+  const name = normalizeName(inst.entity.name);
+  const hit = o.excludeNames.find((n) => normalizeName(n) === name);
+  return hit ? `name "${inst.entity.name}"` : undefined;
 };
+
+/** Case/space/punctuation-insensitive form, so "Clone Spell" and "cloneSpell" match. */
+export const normalizeName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 export function buildTasks(village: Village, catalog: Catalog, o: TaskOptions): TaskSet {
   const tasks: Task[] = [];

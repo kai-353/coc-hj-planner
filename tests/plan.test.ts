@@ -74,3 +74,47 @@ describe("plan invariants", () => {
     expect(plan.taskSet.tasks.some((t) => t.category === "crafted-defenses")).toBe(false);
   });
 });
+
+describe("shop limits and potions", () => {
+  const plan = makePlan(
+    {
+      ...DEFAULTS,
+      village: "",
+      inventory: { builderPotion: 4, researchPotion: 1, gems: 6000, leagueMedals: 2000, raidMedals: 5000 },
+      exclude: { categories: ["siege-machines", "supercharges", "guardians"], names: [] },
+    },
+    village,
+    catalog,
+  );
+
+  test("raid medal research potions respect 3 per shop week", () => {
+    const bought = plan.acquisitions.filter((a) => a.item === "researchPotion" && a.source === "raidMedals");
+    const perWeek = new Map<number, number>();
+    for (const a of bought) {
+      const week = Math.floor((a.availableAt - parseIso(DEFAULTS.shopWeekReset)) / (7 * 24 * 60));
+      perWeek.set(week, (perWeek.get(week) ?? 0) + 1);
+    }
+    for (const n of perWeek.values()) expect(n).toBeLessThanOrEqual(3);
+  });
+
+  test("potions are drunk in batches and only once available", () => {
+    for (const q of QUEUES)
+      for (const e of plan.results[q].events) {
+        if (e.kind !== "potion") continue;
+        expect(e.until - e.t).toBe(e.uses.length * 60);
+        for (const u of e.uses) expect(u.availableAt).toBeLessThanOrEqual(e.t);
+      }
+  });
+
+  test("name exclusions ignore case, spaces and punctuation", () => {
+    const p = makePlan(
+      { ...DEFAULTS, village: "", exclude: { categories: [], names: ["cloneSpell", "GOLD storage"] } },
+      village,
+      catalog,
+    );
+    const names = new Set(p.taskSet.tasks.map((t) => t.name));
+    expect(names.has("Clone Spell")).toBe(false);
+    expect(names.has("Gold Storage")).toBe(false);
+    expect(names.has("Elixir Storage")).toBe(true);
+  });
+});
