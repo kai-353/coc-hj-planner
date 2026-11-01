@@ -8,7 +8,7 @@ import { DEFAULTS, ITEM_KEYS, resolveConfig } from "./config";
 import { ITEMS, makePlan } from "./plan";
 import { buildTasks } from "./tasks";
 import { toEpochMin } from "./time";
-import { buildPlanView } from "./view";
+import { buildPlanView, itemImage } from "./view";
 import { parseVillage } from "./village";
 
 const catalog = await Catalog.load();
@@ -20,7 +20,7 @@ const ALWAYS_SKIPPED = new Set(["crafted-defenses", "pets"]);
 export interface Meta {
   defaults: typeof DEFAULTS;
   categories: string[];
-  items: { key: string; label: string; kind: string }[];
+  items: { key: string; label: string; kind: string; image: string }[];
 }
 
 export interface VillageSummary {
@@ -64,7 +64,7 @@ const server = serve({
         Response.json({
           defaults: DEFAULTS,
           categories: CATEGORIES.filter((c) => !ALWAYS_SKIPPED.has(c)),
-          items: ITEM_KEYS.map((key) => ({ key, label: ITEMS[key].label, kind: ITEMS[key].kind })),
+          items: ITEM_KEYS.map((key) => ({ key, label: ITEMS[key].label, kind: ITEMS[key].kind, image: itemImage(key) })),
         } satisfies Meta),
     },
 

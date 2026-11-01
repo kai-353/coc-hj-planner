@@ -1,6 +1,6 @@
 // JSON-serialisable view of a plan, shared by the Markdown report and the web UI.
 
-import type { Currency } from "./config";
+import type { Currency, ItemKey } from "./config";
 import { ITEMS, type Plan, type PlanQueue, QUEUES } from "./plan";
 import { GOBLIN_SLOT } from "./sim";
 import { DAY } from "./time";
@@ -34,9 +34,9 @@ export type ScheduleRow = {
 } & (
   | { kind: "start"; actor: string; task: TaskRef; durMin: number; gems: number; doneAt: string | null }
   | { kind: "overnight"; actor: string; task: TaskRef }
-  | { kind: "potion"; item: string; count: number; sources: string; until: string }
-  | { kind: "helper"; helper: string; task: TaskRef }
-  | { kind: "book" | "hammer"; item: string; task: TaskRef }
+  | { kind: "potion"; item: string; image: string; count: number; sources: string; until: string }
+  | { kind: "helper"; helper: string; image: string; task: TaskRef }
+  | { kind: "book" | "hammer"; item: string; image: string; task: TaskRef }
 );
 
 export interface Timeline {
@@ -90,7 +90,14 @@ export interface PlanView {
   }[];
   /** Builders and lab must be free by this time (null = no requirement). */
   freeBy: string | null;
-  items: { label: string; source: string; price: number | null; currency: string | null; count: number }[];
+  items: {
+    label: string;
+    image: string;
+    source: string;
+    price: number | null;
+    currency: string | null;
+    count: number;
+  }[];
   goblins: { name: string; upgrades: number; gems: number }[];
   spent: { currency: Currency; label: string; amount: number }[];
   shortfall: {
@@ -105,6 +112,15 @@ export interface PlanView {
   resources: { resource: string; amount: number }[];
   skipped: (TaskRef & { reason: string })[];
 }
+
+/** Picture of a magic item, e.g. builderPotion → /img/magic-items/potions/builder-potion.png. */
+export const itemImage = (key: string) =>
+  `/img/magic-items/${ITEMS[key as ItemKey].kind}s/${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}.png`;
+
+const HELPER_IMAGE: Record<PlanQueue, string> = {
+  builder: "/img/home/other/helpers/builders-apprentice/normal.png",
+  lab: "/img/home/other/helpers/lab-assistant/normal.png",
+};
 
 const ref = (t: Task): TaskRef => ({
   label: t.label,
@@ -129,6 +145,7 @@ export function buildPlanView(plan: Plan): PlanView {
     const key = `${a.item}|${a.source}`;
     const row = items.get(key) ?? {
       label: ITEMS[a.item].label,
+      image: itemImage(a.item),
       source: SOURCE_LABEL[a.source],
       price: a.source === "owned" ? null : a.price,
       currency: a.source === "owned" ? null : CURRENCY_LABEL[a.source],
@@ -188,6 +205,7 @@ export function buildPlanView(plan: Plan): PlanView {
             ...base(e.t),
             kind: "potion",
             item: e.uses[0]!.label,
+            image: itemImage(e.uses[0]!.item),
             count: e.uses.length,
             sources:
               bySource.size === 1 ? [...bySource.keys()][0]! : [...bySource].map(([s, n]) => `${n} ${s}`).join(", "),
@@ -196,10 +214,16 @@ export function buildPlanView(plan: Plan): PlanView {
           break;
         }
         case "helper":
-          rows.push({ ...base(e.t), kind: "helper", helper: e.helper, task: ref(e.task) });
+          rows.push({ ...base(e.t), kind: "helper", helper: e.helper, image: HELPER_IMAGE[q], task: ref(e.task) });
           break;
         case "instant":
-          rows.push({ ...base(e.t), kind: e.token.kind, item: e.token.label, task: ref(e.task) });
+          rows.push({
+            ...base(e.t),
+            kind: e.token.kind,
+            item: e.token.label,
+            image: itemImage(e.token.item),
+            task: ref(e.task),
+          });
           break;
       }
     }

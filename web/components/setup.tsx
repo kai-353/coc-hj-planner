@@ -83,10 +83,23 @@ export function VillageCard() {
   );
 }
 
-function NumberField({ id, label, value, onChange }: { id: string; label: string; value: number; onChange: (n: number) => void }) {
+function NumberField({
+  id,
+  label,
+  image,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  image?: string;
+  value: number;
+  onChange: (n: number) => void;
+}) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id} className="text-xs text-muted-foreground">
+        {image && <img src={image} alt="" className="-my-1 size-5 object-contain" />}
         {label}
       </Label>
       <Input
@@ -120,7 +133,14 @@ export function InventoryCard() {
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           {potions.map((i) => (
-            <NumberField key={i.key} id={i.key} label={i.label} value={settings.inventory[i.key] ?? 0} onChange={(n) => setCount(i.key, n)} />
+            <NumberField
+              key={i.key}
+              id={i.key}
+              label={i.label}
+              image={i.image}
+              value={settings.inventory[i.key] ?? 0}
+              onChange={(n) => setCount(i.key, n)}
+            />
           ))}
           {CURRENCIES.map((c) => (
             <NumberField key={c.key} id={c.key} label={c.label} value={settings.inventory[c.key] ?? 0} onChange={(n) => setCount(c.key, n)} />
@@ -152,6 +172,7 @@ export function InventoryCard() {
                   >
                     {allowed ? <LockOpen className="size-4" /> : <Lock className="size-4 text-muted-foreground" />}
                   </Button>
+                  <img src={i.image} alt="" className={cn("size-6 object-contain", !allowed && "opacity-50 grayscale")} />
                   <span className={cn("flex-1 text-sm", !allowed && "text-muted-foreground")}>{i.label}</span>
                   <Input
                     aria-label={`${i.label} owned`}

@@ -9,7 +9,6 @@ import {
   Hammer,
   List,
   Moon,
-  Sparkles,
   UserCog,
   Wrench,
 } from "lucide-react";
@@ -116,7 +115,7 @@ function Items({ plan }: { plan: PlanView }) {
           <ul className="grid gap-2 sm:grid-cols-2">
             {plan.items.map((i) => (
               <li key={`${i.label}|${i.source}`} className="flex items-center gap-3 rounded-lg border p-3 text-sm">
-                <Sparkles className="size-4 shrink-0 text-muted-foreground" />
+                <img src={i.image} alt="" loading="lazy" className="size-8 shrink-0 object-contain" />
                 <span className="flex-1">
                   <span className="font-medium">
                     {i.count}× {i.label}
@@ -308,6 +307,8 @@ function Row({ row: r, past }: { row: ScheduleRow; past: boolean }) {
       <span className="w-11 shrink-0 pt-0.5 font-mono text-xs tabular-nums text-muted-foreground">{r.time}</span>
       {r.kind === "start" && r.task.image ? (
         <TaskImage task={r.task} className="size-8 -my-1" />
+      ) : "image" in r ? (
+        <img src={r.image} alt="" loading="lazy" className="-my-1 size-8 shrink-0 object-contain" />
       ) : (
         <span className="flex w-8 shrink-0 justify-center">
           <Icon
