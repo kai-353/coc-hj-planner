@@ -72,8 +72,8 @@ export const DEFAULTS: Omit<Config, "village"> = {
     "hammerOfSpells",
   ],
   goblinGemsPerDay: 40,
-  // The user's points on 1 Nov (110/day max incl. bonus). Tier thresholds are PLACEHOLDERS that
-  // could not be confirmed; take them from the in-game Gold Pass screen.
+  // The user's points on 1 Nov (110/day max incl. bonus). Research tiers are confirmed by the user;
+  // builder tier thresholds are still PLACEHOLDERS (take them from the in-game Gold Pass screen).
   goldPass: {
     points: 440,
     pointsAsOf: "2026-11-01T18:33:00Z",

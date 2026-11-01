@@ -70,7 +70,8 @@ Runtime is **Bun** (Node is not installed): `bun run dev` (web app), `bun run pl
   Tiers unlock with Gold Pass **points**. Assume the user always has the maximum points attainable
   by each day: max **110 points/day** (bonus included), **440 points on 1 Nov 2026** (taken to include
   that day's points). A tier unlocks at the daily reset (08:00 UTC) that brings the maximum to its
-  threshold (`src/goldpass.ts`). Tier point thresholds are still placeholders (unconfirmed).
+  threshold (`src/goldpass.ts`). Research tiers confirmed: 10% at 20, **15% at 580, 20% at 1000**
+  points. Builder tier thresholds (10/640/1060) are still unconfirmed placeholders.
   Progress is valued in full-price minutes, so boosting more-discounted upgrades counts for more.
 - The user prefers using potions sooner rather than later (even pacing over the event).
 - Owned items are always used before buying the same item.
