@@ -42,6 +42,11 @@ export interface Config {
   neverUse: ItemKey[];
   /** Gems per day of upgrade time for the Goblin Builder / Goblin Researcher; null disables them. */
   goblinGemsPerDay: number | null;
+  /**
+   * Gold Pass builder/research boost: from each `from` time on, upgrades started then are a further
+   * `reduction` (0–1) shorter. Stacks multiplicatively with the event discount. Empty = no Gold Pass.
+   */
+  goldPass: { from: string; reduction: number }[];
   exclude: { categories: string[]; names: string[] };
   /** How "expensive" each special item is to spend, in gem-equivalents. The planner minimises the total. */
   value: Partial<Record<ItemKey | Currency, number>>;
@@ -69,6 +74,12 @@ export const DEFAULTS: Omit<Config, "village"> = {
     "hammerOfSpells",
   ],
   goblinGemsPerDay: 40,
+  // Boost tiers unlock with Gold Pass points, so these dates are placeholders to adjust.
+  goldPass: [
+    { from: "2026-11-01T00:00:00Z", reduction: 0.1 },
+    { from: "2026-11-08T08:00:00Z", reduction: 0.15 },
+    { from: "2026-11-15T08:00:00Z", reduction: 0.2 },
+  ],
   exclude: { categories: [], names: [] },
   value: {
     gems: 1,

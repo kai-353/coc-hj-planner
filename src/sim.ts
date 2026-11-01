@@ -62,6 +62,8 @@ export interface SimConfig {
   /** Completion times of tasks in other queues (for cross-queue prerequisites). */
   externalDone?: Map<string, number>;
   potionMultiplier: number;
+  /** Extra time reduction (0–1) for upgrades started at t, e.g. the Gold Pass builder/research boost. */
+  reductionAt?: (t: number) => number;
   helper?: Helper;
   goblin?: Goblin;
 }
@@ -70,7 +72,7 @@ export interface SimConfig {
 export const GOBLIN_SLOT = 0;
 
 export type SimEvent =
-  | { t: number; kind: "start"; slot: number; task: Task; gems: number }
+  | { t: number; kind: "start"; slot: number; task: Task; durMin: number; gems: number }
   | { t: number; kind: "finish"; slot: number; task: Task }
   | { t: number; kind: "potion"; uses: PotionUse[]; until: number }
   | { t: number; kind: "helper"; slot: number; task: Task; helper: string }
@@ -84,6 +86,8 @@ export interface SimResult {
   startedAt: Map<string, number>;
   unstarted: Task[];
   unstartedMin: number;
+  /** Progress made while the player can still act, in full-price minutes (so later, more discounted
+   * upgrades count for more per timer minute). */
   workBeforeEnd: number;
   /** Upgrade time skipped by books and hammers. */
   instantMin: number;
@@ -102,6 +106,8 @@ interface Slot {
   goblin: boolean;
   task?: Task;
   rem: number;
+  /** Full-price minutes per timer minute of the current upgrade (progress value). */
+  scale: number;
 }
 
 /** Largest potion batch considered at once. */
@@ -109,7 +115,7 @@ const MAX_BATCH = 6;
 
 const longest = (xs: Task[]) => xs.reduce((a, b) => (b.durMin > a.durMin ? b : a));
 
-export const goblinGems = (task: Task, gemsPerDay: number) => Math.ceil((task.durMin / DAY) * gemsPerDay);
+export const goblinGems = (durMin: number, gemsPerDay: number) => Math.ceil((durMin / DAY) * gemsPerDay);
 
 export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
   const { clock, start, end } = cfg;
@@ -119,8 +125,8 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
   const startedAt = new Map<string, number>();
   const ids = new Set(cfg.tasks.map((t) => t.id));
   const pending = new Set<Task>();
-  const slots: Slot[] = Array.from({ length: cfg.slots }, (_, i) => ({ id: i + 1, temp: false, goblin: false, rem: 0 }));
-  const goblinSlot: Slot | undefined = cfg.goblin ? { id: GOBLIN_SLOT, temp: false, goblin: true, rem: 0 } : undefined;
+  const slots: Slot[] = Array.from({ length: cfg.slots }, (_, i) => ({ id: i + 1, temp: false, goblin: false, rem: 0, scale: 1 }));
+  const goblinSlot: Slot | undefined = cfg.goblin ? { id: GOBLIN_SLOT, temp: false, goblin: true, rem: 0, scale: 1 } : undefined;
   if (goblinSlot) slots.push(goblinSlot);
   const isRegular = (s: Slot) => !s.temp && !s.goblin;
 
@@ -135,7 +141,7 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
         : undefined
       : slots.find((s) => isRegular(s) && !s.task);
     if (!slot) {
-      slot = { id: slots.length + 1, temp: true, goblin: false, rem: 0 };
+      slot = { id: slots.length + 1, temp: true, goblin: false, rem: 0, scale: 1 };
       slots.push(slot);
     }
     slot.task = task;
@@ -180,6 +186,8 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
     if (pending.size <= cfg.slots) return new Set<Task>();
     return new Set(free.sort((a, b) => b.durMin - a.durMin).slice(0, cfg.slots));
   };
+  /** Timer of an upgrade started at t (event discount is in durMin; the Gold Pass depends on t). */
+  const durAt = (x: Task, t: number) => Math.round(x.durMin * (1 - (cfg.reductionAt?.(t) ?? 0)));
   const idleUntilMorning = (t: number) => clock.nextAwake(t) - t;
 
   // Last moment the player can act before the event ends; progress after it can't start anything new.
@@ -214,17 +222,17 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
   const choose = (t: number, avail: Task[], res: Set<Task>): Task | undefined => {
     if (!avail.length) return undefined;
     // An upgrade only "fits" if the slot frees up while the player can still start the next one.
-    const fits = avail.filter((x) => !res.has(x) && t + x.durMin <= lastAction);
-    const good = fits.filter((x) => clock.isAwake(t + x.durMin));
+    const fits = avail.filter((x) => !res.has(x) && t + durAt(x, t) <= lastAction);
+    const good = fits.filter((x) => clock.isAwake(t + durAt(x, t)));
     if (good.length) return mostUrgent(good);
     if (fits.length)
       return fits.reduce((a, b) => {
-        const ia = idleUntilMorning(t + a.durMin);
-        const ib = idleUntilMorning(t + b.durMin);
+        const ia = idleUntilMorning(t + durAt(a, t));
+        const ib = idleUntilMorning(t + durAt(b, t));
         return ib < ia || (ib === ia && b.durMin > a.durMin) ? b : a;
       });
     // Nothing else fits before the event ends: this is the slot's last upgrade of the event.
-    const awakeEnd = avail.filter((x) => clock.isAwake(t + x.durMin));
+    const awakeEnd = avail.filter((x) => clock.isAwake(t + durAt(x, t)));
     return longest(awakeEnd.length ? awakeEnd : avail);
   };
 
@@ -240,7 +248,7 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
       startedAt.set(task.id, t);
       doneAt.set(task.id, t);
       tokensUsed++;
-      instantMin += task.durMin;
+      instantMin += task.fullDurMin;
       tokens.splice(tokens.indexOf(token), 1);
       events.push({ t, kind: "instant", token, task });
     }
@@ -254,14 +262,16 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
       if (!slot.goblin) useTokens(t, "book");
       const task = choose(t, available(t), reserved());
       if (!task) break;
-      const gems = slot.goblin ? goblinGems(task, cfg.goblin!.gemsPerDay) : 0;
+      const dur = durAt(task, t);
+      const gems = slot.goblin ? goblinGems(dur, cfg.goblin!.gemsPerDay) : 0;
       if (slot.goblin) goblinLeft--;
       gemsSpent += gems;
       pending.delete(task);
       startedAt.set(task.id, t);
       slot.task = task;
-      slot.rem = task.durMin;
-      events.push({ t, kind: "start", slot: slot.id, task, gems });
+      slot.rem = dur;
+      slot.scale = task.fullDurMin / Math.max(1, dur);
+      events.push({ t, kind: "start", slot: slot.id, task, durMin: dur, gems });
     }
 
     const busy = slots.filter((s) => s.task);
@@ -343,7 +353,7 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
       if (s.task) {
         const progress = Math.min(s.rem, rate(s, t) * dt);
         s.rem -= progress;
-        if (t < lastAction) work += progress;
+        if (t < lastAction) work += progress * s.scale;
         if (s.rem <= 1e-9) {
           doneAt.set(s.task.id, next);
           events.push({ t: next, kind: "finish", slot: s.id, task: s.task });

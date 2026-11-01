@@ -1,7 +1,7 @@
 import { CalendarClock, Loader2, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Results } from "@/components/results";
-import { ExclusionsCard, InventoryCard, SettingsCard, VillageCard } from "@/components/setup";
+import { ExclusionsCard, GoldPassCard, InventoryCard, SettingsCard, VillageCard } from "@/components/setup";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -41,6 +41,7 @@ export function App() {
               <VillageCard />
               <InventoryCard />
               <ExclusionsCard />
+              <GoldPassCard />
               <SettingsCard />
             </>
           ) : (

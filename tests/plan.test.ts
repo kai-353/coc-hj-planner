@@ -107,6 +107,27 @@ describe("shop limits and potions", () => {
       }
   });
 
+  test("Gold Pass shortens upgrades by the boost active at their start", () => {
+    const steps = DEFAULTS.goldPass.map((s) => ({ from: parseIso(s.from), reduction: s.reduction }));
+    const at = (t: number) => steps.findLast((s) => s.from <= t)?.reduction ?? 0;
+    let checked = 0;
+    for (const q of QUEUES)
+      for (const e of plan.results[q].events) {
+        if (e.kind !== "start") continue;
+        expect(e.durMin).toBe(Math.round(e.task.durMin * (1 - at(e.t))));
+        checked++;
+      }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  test("owned items are used before buying the same item", () => {
+    for (const key of ["builderPotion", "researchPotion"] as const) {
+      const bought = plan.acquisitions.some((a) => a.item === key && a.source !== "owned");
+      const owned = plan.acquisitions.filter((a) => a.item === key && a.source === "owned").length;
+      if (bought) expect(owned).toBe({ builderPotion: 4, researchPotion: 1 }[key]);
+    }
+  });
+
   test("back-to-back potion drinks are merged into one batch", () => {
     for (const q of QUEUES) {
       const drinks = plan.results[q].events.filter((e) => e.kind === "potion");

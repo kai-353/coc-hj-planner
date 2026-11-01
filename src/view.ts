@@ -130,7 +130,7 @@ export function buildPlanView(plan: Plan): PlanView {
             kind: "start",
             actor: actor(e.slot),
             task: ref(e.task),
-            durMin: e.task.durMin,
+            durMin: e.durMin,
             gems: e.gems,
             doneAt: fin != null ? clock.dateTime(fin) : null,
           });

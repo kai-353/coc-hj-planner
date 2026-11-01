@@ -65,6 +65,12 @@ Runtime is **Bun** (Node is not installed): `bun run dev` (web app), `bun run pl
   help; an upgrade only "fits" if it ends before that moment.
 - Upgrade chains (e.g. a guardian's 4 levels) are scheduled by critical path so they start early.
 - The user doesn't care about guardians (excluded in their config).
+- **Gold Pass** (the user has it): builder & research time boost of 10% → 15% → 20% during the season,
+  stacking multiplicatively with Hammer Jam (0.5 × 0.8 = 0.4, "60% off"). Locked in at upgrade start.
+  Tiers unlock with Gold Pass **points**, not fixed days, so `goldPass` dates are user estimates.
+  Progress is valued in full-price minutes, so boosting more-discounted upgrades counts for more.
+- The user prefers using potions sooner rather than later (even pacing over the event).
+- Owned items are always used before buying the same item.
 
 Assumptions in the model that are worth verifying in game: potions also speed up the goblin's upgrade;
 the Apprentice/Assistant can't be put on the goblin's upgrade; the helper cooldown is 23 h.

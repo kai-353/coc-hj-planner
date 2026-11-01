@@ -86,6 +86,11 @@ export function makePlan(config: Config, village: Village, catalog: Catalog): Pl
     elapsedMin: Math.max(0, start - exportAt),
   });
 
+  const steps = config.goldPass
+    .map((s) => ({ from: parseIso(s.from), reduction: s.reduction }))
+    .sort((a, b) => a.from - b.from);
+  const goldPassAt = (t: number) => steps.findLast((s) => s.from <= t)?.reduction ?? 0;
+
   const helperFor = (q: PlanQueue) => {
     const h = q === "builder" ? village.apprentice : q === "lab" ? village.labAssistant : undefined;
     if (!h || h.level <= 0) return undefined;
@@ -109,6 +114,7 @@ export function makePlan(config: Config, village: Village, catalog: Catalog): Pl
         tasks: taskSet.tasks.filter((t) => t.queue === q),
         potionMultiplier: q === "builder" ? 10 : 24,
         helper: helperFor(q),
+        reductionAt: goldPassAt,
         goblin:
           config.goblinGemsPerDay == null
             ? undefined
@@ -229,49 +235,44 @@ function optimize(
     );
   };
 
-  const limitedOffer = (a: Acquisition) =>
-    config.shop.some(
-      (o) => o.item === a.item && o.currency === a.source && (o.limitPerWeek || o.cooldownDays || o.limit != null),
-    );
+  /** The next copy of `item` from `source`, given what `list` already holds (undefined if not possible). */
+  const nextAcq = (
+    queue: PlanQueue,
+    item: Acquisition["item"],
+    source: Acquisition["source"],
+    list: Acquisition[],
+  ): Acquisition | undefined => {
+    if (item === "goblin") return { item, queue, source: "gems", price: 0, availableAt: start, costPoints: 0 };
+    const count = list.filter((a) => a.item === item && a.source === source).length;
+    if (source === "owned")
+      return count < (budget.owned[item] ?? 0)
+        ? { item, queue, source, price: 0, availableAt: start, costPoints: value(item) * 0.999 }
+        : undefined;
+    const offer = config.shop.find((o) => o.item === item && o.currency === source);
+    if (!offer || (offer.limit != null && count >= offer.limit)) return undefined;
+    let availableAt = start + count * (offer.cooldownDays ?? 0) * DAY;
+    if (offer.limitPerWeek) {
+      // The n-th purchase has to wait for the shop week it falls in.
+      const anchor = parseIso(config.shopWeekReset);
+      const currentWeek = anchor + Math.floor((start - anchor) / (7 * DAY)) * 7 * DAY;
+      availableAt = Math.max(availableAt, currentWeek + Math.floor(count / offer.limitPerWeek) * 7 * DAY);
+    }
+    if (availableAt >= simConfigs[queue].end) return undefined;
+    return { item, queue, source, price: offer.price, availableAt, costPoints: offer.price * value(source) };
+  };
 
-  // Candidate acquisitions for a queue, cheapest source per item/availability.
-  const candidates = (queue: PlanQueue): Acquisition[] => {
-    const out: Acquisition[] = [];
-    const used = ownedOf(acqs);
+  // Every (item, source) pair that could help this queue; the score decides between sources.
+  const sources = (queue: PlanQueue) => {
+    const out: [Acquisition["item"], Acquisition["source"]][] = [];
     for (const item of ITEM_KEYS) {
       if (config.neverUse.includes(item)) continue;
       const info = ITEMS[item];
       if (!info.classes.some((c) => QUEUE_CLASSES[queue].includes(c))) continue;
       if (info.kind === "potion" && POTION_FOR[queue] !== item) continue;
-      const opts: Acquisition[] = [];
-      if ((used[item] ?? 0) < (budget.owned[item] ?? 0))
-        opts.push({ item, queue, source: "owned", price: 0, availableAt: start, costPoints: value(item) * 0.999 });
-      for (const offer of config.shop) {
-        if (offer.item !== item) continue;
-        const bought = acqs.filter((a) => a.item === item && a.source === offer.currency).length;
-        if (offer.limit != null && bought >= offer.limit) continue;
-        let availableAt = start + bought * (offer.cooldownDays ?? 0) * DAY;
-        if (offer.limitPerWeek) {
-          // The n-th purchase has to wait for the shop week it falls in.
-          const anchor = parseIso(config.shopWeekReset);
-          const currentWeek = anchor + Math.floor((start - anchor) / (7 * DAY)) * 7 * DAY;
-          availableAt = Math.max(availableAt, currentWeek + Math.floor(bought / offer.limitPerWeek) * 7 * DAY);
-        }
-        if (availableAt >= simConfigs[queue].end) continue;
-        opts.push({
-          item,
-          queue,
-          source: offer.currency,
-          price: offer.price,
-          availableAt,
-          costPoints: offer.price * value(offer.currency),
-        });
-      }
-      opts.sort((a, b) => a.costPoints - b.costPoints);
-      if (opts[0]) out.push(opts[0]);
+      out.push([item, "owned"]);
+      for (const offer of config.shop) if (offer.item === item) out.push([item, offer.currency]);
     }
-    if (simConfigs[queue].goblin)
-      out.push({ item: "goblin", queue, source: "gems", price: 0, availableAt: start, costPoints: 0 });
+    if (simConfigs[queue].goblin) out.push(["goblin", "gems"]);
     return out;
   };
 
@@ -280,13 +281,17 @@ function optimize(
     let best: { batch: Acquisition[]; results: Record<PlanQueue, SimResult>; ratio: number } | undefined;
     for (const queue of QUEUES) {
       if (results[queue].unstartedMin <= 0) continue;
-      for (const acq of candidates(queue)) {
+      for (const [item, source] of sources(queue)) {
         // Timing effects make single items noisy (one potion can shift finishes into the night) and
-        // progress has plateaus, so also try batches of the same item.
-        // Items with weekly limits or cooldowns get different availability per copy, so only batch the rest.
-        const repeatable = acq.source === "owned" || !limitedOffer(acq);
-        for (const k of repeatable ? [1, 2, 3, 5, 8, 13] : [1]) {
-          const batch = Array.from({ length: k }, () => ({ ...acq }));
+        // progress has plateaus, so also try batches. Each copy gets its own availability.
+        const batch: Acquisition[] = [];
+        for (const k of [1, 2, 3, 5, 8, 13]) {
+          while (batch.length < k) {
+            const next = nextAcq(queue, item, source, [...acqs, ...batch]);
+            if (!next) break;
+            batch.push(next);
+          }
+          if (batch.length < k) break;
           const trial = [...acqs, ...batch];
           const r = simulateAll(simConfigs, trial);
           if (!withinBudget(trial, r)) break;
@@ -294,10 +299,12 @@ function optimize(
           const gain =
             totalWork(r) - totalWork(results) + 0.25 * (totalUnstarted(results) - totalUnstarted(r));
           const cost =
-            acq.item === "goblin" ? (totalGems(r) - totalGems(results)) * value("gems") : k * acq.costPoints;
+            item === "goblin"
+              ? (totalGems(r) - totalGems(results)) * value("gems")
+              : batch.reduce((a, b) => a + b.costPoints, 0);
           if (gain <= 0 || cost <= 0) continue;
           const ratio = gain / cost;
-          if (!best || ratio > best.ratio) best = { batch, results: r, ratio };
+          if (!best || ratio > best.ratio) best = { batch: [...batch], results: r, ratio };
         }
       }
     }
@@ -305,6 +312,19 @@ function optimize(
     acqs.push(...best.batch);
     results = best.results;
   }
+
+  // Use what's already in the inventory before anything bought: swap purchases for owned copies.
+  for (const item of ITEM_KEYS) {
+    let spare = (budget.owned[item] ?? 0) - acqs.filter((a) => a.item === item && a.source === "owned").length;
+    const bought = acqs
+      .filter((a) => a.item === item && a.source !== "owned")
+      .sort((a, b) => b.costPoints - a.costPoints);
+    for (const a of bought) {
+      if (spare-- <= 0) break;
+      acqs[acqs.indexOf(a)] = { ...a, source: "owned", price: 0, availableAt: start, costPoints: value(item) * 0.999 };
+    }
+  }
+  results = simulateAll(simConfigs, acqs);
 
   // Drop anything the greedy pass added that turned out not to be needed. While upgrades are still
   // left over, an item only counts as unneeded if removing it costs no progress at all; single

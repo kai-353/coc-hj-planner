@@ -12,6 +12,7 @@ export interface Settings {
   eventEnd: string;
   planFromNow: boolean;
   goblinGemsPerDay: number;
+  goldPass: { enabled: boolean; steps: { from: string; reduction: number }[] };
 }
 
 export const CURRENCIES = [
@@ -31,6 +32,7 @@ export function defaultSettings(meta: Meta): Settings {
     eventEnd: meta.defaults.event.end,
     planFromNow: false,
     goblinGemsPerDay: meta.defaults.goblinGemsPerDay ?? 40,
+    goldPass: { enabled: true, steps: meta.defaults.goldPass },
   };
 }
 
@@ -46,6 +48,7 @@ export function toConfig(s: Settings, meta: Meta) {
     event: { ...meta.defaults.event, end: s.eventEnd },
     planStart: s.planFromNow ? new Date().toISOString() : undefined,
     goblinGemsPerDay: s.goblinGemsPerDay,
+    goldPass: s.goldPass.enabled ? s.goldPass.steps : [],
   };
 }
 

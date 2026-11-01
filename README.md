@@ -48,6 +48,7 @@ bun test
 | `neverUse` | Items never used or bought. Defaults to all books and hammers (saved for the next Town Hall). |
 | `exclude.categories` | Any of `town-hall`, `defenses`, `traps`, `resources`, `army`, `other`, `guardians`, `heroes`, `troops`, `spells`, `siege-machines`, `supercharges` |
 | `exclude.names` | Names to skip, e.g. `"Gold Storage"` (case, spaces and punctuation are ignored) |
+| `goldPass` | Gold Pass builder/research boost steps `[{ "from": ISO, "reduction": 0.1 }, …]`; they unlock with pass points, so set your own dates. `[]` = no Gold Pass |
 | `goblinGemsPerDay` | Goblin Builder / Researcher price (40 gems per day of upgrade time); `null` disables them |
 | `value` | Gem-equivalent "price" of each item/currency. The planner minimises the total value spent. |
 | `shop` | What can be bought, where and for how much (League Shop / Raid Medal Trader), with optional `limit`, `limitPerWeek` and `cooldownDays` |

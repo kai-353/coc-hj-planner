@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { fmtDuration } from "../../src/time";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
@@ -283,6 +283,67 @@ export function SettingsCard() {
           <Switch checked={settings.planFromNow} onCheckedChange={(v) => update({ planFromNow: v })} />
         </label>
       </CardContent>
+    </Card>
+  );
+}
+
+export function GoldPassCard() {
+  const { settings, update } = useReadyPlanner();
+  const gp = settings.goldPass;
+  const setStep = (i: number, patch: Partial<(typeof gp.steps)[number]>) =>
+    update(
+      { goldPass: { ...gp, steps: gp.steps.map((s, j) => (j === i ? { ...s, ...patch } : s)) } },
+      { debounce: true },
+    );
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Gold Pass</CardTitle>
+        <CardDescription>
+          Builder & research boost on top of Hammer Jam, locked in when an upgrade starts. Tiers unlock with
+          Gold Pass points, so set when you expect to reach each one.
+        </CardDescription>
+        <CardAction>
+          <Switch
+            aria-label="I have the Gold Pass"
+            checked={gp.enabled}
+            onCheckedChange={(enabled) => update({ goldPass: { ...gp, enabled } })}
+          />
+        </CardAction>
+      </CardHeader>
+      {gp.enabled && (
+        <CardContent className="space-y-3">
+          {gp.steps.map((step, i) => (
+            <div key={i} className="grid grid-cols-[5.5rem_1fr] items-end gap-2">
+              <div className="space-y-1.5">
+                <Label htmlFor={`gp-pct-${i}`} className="text-xs text-muted-foreground">
+                  Boost %
+                </Label>
+                <Input
+                  id={`gp-pct-${i}`}
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={Math.round(step.reduction * 100)}
+                  onChange={(e) => setStep(i, { reduction: Math.min(100, Math.max(0, Number(e.target.value) || 0)) / 100 })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor={`gp-from-${i}`} className="text-xs text-muted-foreground">
+                  From
+                </Label>
+                <Input
+                  id={`gp-from-${i}`}
+                  type="datetime-local"
+                  value={toLocalInput(step.from)}
+                  onChange={(e) => e.target.value && setStep(i, { from: new Date(e.target.value).toISOString() })}
+                />
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      )}
     </Card>
   );
 }
