@@ -67,7 +67,10 @@ Runtime is **Bun** (Node is not installed): `bun run dev` (web app), `bun run pl
 - The user doesn't care about guardians (excluded in their config).
 - **Gold Pass** (the user has it): builder & research time boost of 10% → 15% → 20% during the season,
   stacking multiplicatively with Hammer Jam (0.5 × 0.8 = 0.4, "60% off"). Locked in at upgrade start.
-  Tiers unlock with Gold Pass **points**, not fixed days, so `goldPass` dates are user estimates.
+  Tiers unlock with Gold Pass **points**. Assume the user always has the maximum points attainable
+  by each day: max **110 points/day** (bonus included), **440 points on 1 Nov 2026** (taken to include
+  that day's points). A tier unlocks at the daily reset (08:00 UTC) that brings the maximum to its
+  threshold (`src/goldpass.ts`). Tier point thresholds are still placeholders (unconfirmed).
   Progress is valued in full-price minutes, so boosting more-discounted upgrades counts for more.
 - The user prefers using potions sooner rather than later (even pacing over the event).
 - Owned items are always used before buying the same item.

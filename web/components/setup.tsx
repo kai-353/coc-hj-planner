@@ -1,5 +1,6 @@
 import { ChevronsUpDown, FileJson, Lock, LockOpen, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
+import { tierUnlock } from "../../src/goldpass";
 import { fmtDuration } from "../../src/time";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -290,64 +291,93 @@ export function SettingsCard() {
 export function GoldPassCard() {
   const { settings, update } = useReadyPlanner();
   const gp = settings.goldPass;
-  const setStep = (i: number, patch: Partial<(typeof gp.steps)[number]>) =>
-    update(
-      { goldPass: { ...gp, steps: gp.steps.map((s, j) => (j === i ? { ...s, ...patch } : s)) } },
-      { debounce: true },
-    );
+  const set = (patch: Partial<typeof gp>, debounce = true) => update({ goldPass: { ...gp, ...patch } }, { debounce });
+  const setTier = (kind: "builder" | "research", i: number, points: number) =>
+    set({ [kind]: gp[kind].map((t, j) => (j === i ? { ...t, points } : t)) });
+  const unlockLabel = (points: number) => {
+    const t = tierUnlock(gp, points);
+    if (t === -Infinity) return "now";
+    return Number.isFinite(t)
+      ? new Date(t * 60_000).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })
+      : "never";
+  };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Gold Pass</CardTitle>
         <CardDescription>
-          Builder & research boost on top of Hammer Jam, locked in when an upgrade starts. Tiers unlock with
-          Gold Pass points, so set when you expect to reach each one.
+          Builder & research boost on top of Hammer Jam, locked in when an upgrade starts. Assumes you earn
+          the most points possible every day; tier thresholds are on the in-game Gold Pass screen.
         </CardDescription>
         <CardAction>
           <Switch
             aria-label="I have the Gold Pass"
             checked={gp.enabled}
-            onCheckedChange={(enabled) => update({ goldPass: { ...gp, enabled } })}
+            onCheckedChange={(enabled) => set({ enabled }, false)}
           />
         </CardAction>
       </CardHeader>
       {gp.enabled && (
-        <CardContent className="space-y-3">
-          {gp.steps.map((step, i) => (
-            <div key={i} className="grid grid-cols-[5.5rem_1fr] items-end gap-2">
-              <div className="space-y-1.5">
-                <Label htmlFor={`gp-pct-${i}`} className="text-xs text-muted-foreground">
-                  Boost %
-                </Label>
-                <Input
-                  id={`gp-pct-${i}`}
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={Math.round(step.reduction * 100)}
-                  onChange={(e) => setStep(i, { reduction: Math.min(100, Math.max(0, Number(e.target.value) || 0)) / 100 })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor={`gp-from-${i}`} className="text-xs text-muted-foreground">
-                  From
-                </Label>
-                <Input
-                  id={`gp-from-${i}`}
-                  type="datetime-local"
-                  value={toLocalInput(step.from)}
-                  onChange={(e) => e.target.value && setStep(i, { from: new Date(e.target.value).toISOString() })}
-                />
-              </div>
-            </div>
-          ))}
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <NumberField
+              id="gp-points"
+              label="Points now"
+              value={gp.points}
+              onChange={(points) => set({ points, pointsAsOf: new Date().toISOString() })}
+            />
+            <NumberField
+              id="gp-ppd"
+              label="Max points per day"
+              value={gp.pointsPerDay}
+              onChange={(pointsPerDay) => set({ pointsPerDay })}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            As of {new Date(gp.pointsAsOf).toLocaleString()}, including today's points. Each daily reset
+            (09:00 Amsterdam) adds the daily maximum.
+          </p>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-muted-foreground">
+                <th className="pb-1.5 text-left font-normal">Boost</th>
+                <th className="pb-1.5 text-left font-normal">Builder (points)</th>
+                <th className="pb-1.5 text-left font-normal">Research (points)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {gp.builder.map((tier, i) => (
+                <tr key={i} className="align-top">
+                  <td className="pt-2 pr-2 font-medium tabular-nums">{Math.round(tier.reduction * 100)}%</td>
+                  {(["builder", "research"] as const).map((kind) => {
+                    const t = gp[kind][i];
+                    if (!t) return <td key={kind} />;
+                    return (
+                      <td key={kind} className="pr-2">
+                        <Input
+                          aria-label={`${kind} ${Math.round(t.reduction * 100)}% points`}
+                          type="number"
+                          min={0}
+                          className="h-8"
+                          value={t.points}
+                          onChange={(e) => setTier(kind, i, Math.max(0, Number(e.target.value) || 0))}
+                        />
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {unlockLabel(t.points) === "now" ? "unlocked" : `from ${unlockLabel(t.points)}`}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </CardContent>
       )}
     </Card>
   );
 }
-
 /** Searchable multi-select of everything that still has upgrades left. */
 function NamePicker({
   options,

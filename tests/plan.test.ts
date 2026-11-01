@@ -3,6 +3,7 @@ import { Catalog } from "../src/catalog";
 import { DEFAULTS } from "../src/config";
 import { makePlan, QUEUES } from "../src/plan";
 import { buildTasks } from "../src/tasks";
+import { boostAt, boostSteps, tierUnlock } from "../src/goldpass";
 import { Clock, parseIso } from "../src/time";
 import { parseVillage } from "../src/village";
 
@@ -108,16 +109,26 @@ describe("shop limits and potions", () => {
   });
 
   test("Gold Pass shortens upgrades by the boost active at their start", () => {
-    const steps = DEFAULTS.goldPass.map((s) => ({ from: parseIso(s.from), reduction: s.reduction }));
-    const at = (t: number) => steps.findLast((s) => s.from <= t)?.reduction ?? 0;
     let checked = 0;
-    for (const q of QUEUES)
+    for (const q of QUEUES) {
+      const steps = boostSteps(DEFAULTS.goldPass!, q === "builder" ? "builder" : "research");
       for (const e of plan.results[q].events) {
         if (e.kind !== "start") continue;
-        expect(e.durMin).toBe(Math.round(e.task.durMin * (1 - at(e.t))));
+        expect(e.durMin).toBe(Math.round(e.task.durMin * (1 - boostAt(steps, e.t))));
         checked++;
       }
+    }
     expect(checked).toBeGreaterThan(0);
+  });
+
+  test("Gold Pass tiers unlock at the daily reset that brings the maximum points to them", () => {
+    const gp = { ...DEFAULTS.goldPass!, points: 440, pointsAsOf: "2026-11-01T18:33:00Z", pointsPerDay: 110 };
+    expect(tierUnlock(gp, 440)).toBe(-Infinity);
+    expect(tierUnlock(gp, 441)).toBe(parseIso("2026-11-02T08:00:00Z"));
+    expect(tierUnlock(gp, 550)).toBe(parseIso("2026-11-02T08:00:00Z"));
+    expect(tierUnlock(gp, 551)).toBe(parseIso("2026-11-03T08:00:00Z"));
+    // Before the day's reset, that same day's reset is the next one.
+    expect(tierUnlock({ ...gp, pointsAsOf: "2026-11-02T07:00:00Z" }, 441)).toBe(parseIso("2026-11-02T08:00:00Z"));
   });
 
   test("owned items are used before buying the same item", () => {

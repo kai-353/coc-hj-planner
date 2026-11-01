@@ -1,4 +1,5 @@
 import { CATEGORIES } from "./catalog";
+import type { GoldPass } from "./goldpass";
 
 export const ITEM_KEYS = [
   "builderPotion",
@@ -42,11 +43,8 @@ export interface Config {
   neverUse: ItemKey[];
   /** Gems per day of upgrade time for the Goblin Builder / Goblin Researcher; null disables them. */
   goblinGemsPerDay: number | null;
-  /**
-   * Gold Pass builder/research boost: from each `from` time on, upgrades started then are a further
-   * `reduction` (0–1) shorter. Stacks multiplicatively with the event discount. Empty = no Gold Pass.
-   */
-  goldPass: { from: string; reduction: number }[];
+  /** Gold Pass builder/research boosts (unlocked by season points); null = no Gold Pass. */
+  goldPass: GoldPass | null;
   exclude: { categories: string[]; names: string[] };
   /** How "expensive" each special item is to spend, in gem-equivalents. The planner minimises the total. */
   value: Partial<Record<ItemKey | Currency, number>>;
@@ -74,12 +72,23 @@ export const DEFAULTS: Omit<Config, "village"> = {
     "hammerOfSpells",
   ],
   goblinGemsPerDay: 40,
-  // Boost tiers unlock with Gold Pass points, so these dates are placeholders to adjust.
-  goldPass: [
-    { from: "2026-11-01T00:00:00Z", reduction: 0.1 },
-    { from: "2026-11-08T08:00:00Z", reduction: 0.15 },
-    { from: "2026-11-15T08:00:00Z", reduction: 0.2 },
-  ],
+  // The user's points on 1 Nov (110/day max incl. bonus). Tier thresholds are PLACEHOLDERS that
+  // could not be confirmed; take them from the in-game Gold Pass screen.
+  goldPass: {
+    points: 440,
+    pointsAsOf: "2026-11-01T18:33:00Z",
+    pointsPerDay: 110,
+    builder: [
+      { points: 10, reduction: 0.1 },
+      { points: 640, reduction: 0.15 },
+      { points: 1060, reduction: 0.2 },
+    ],
+    research: [
+      { points: 20, reduction: 0.1 },
+      { points: 580, reduction: 0.15 },
+      { points: 1000, reduction: 0.2 },
+    ],
+  },
   exclude: { categories: [], names: [] },
   value: {
     gems: 1,
@@ -123,6 +132,7 @@ export function resolveConfig(user: any): Config {
     event: { ...DEFAULTS.event, ...user.event },
     exclude: { ...DEFAULTS.exclude, ...user.exclude },
     value: { ...DEFAULTS.value, ...user.value },
+    goldPass: user.goldPass === null ? null : { ...DEFAULTS.goldPass!, ...user.goldPass },
   };
   for (const c of cfg.exclude.categories)
     if (!(CATEGORIES as readonly string[]).includes(c))

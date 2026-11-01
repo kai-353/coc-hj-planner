@@ -1,3 +1,4 @@
+import type { GoldPass } from "../../src/goldpass";
 import type { Meta } from "./api";
 
 export interface Settings {
@@ -12,7 +13,7 @@ export interface Settings {
   eventEnd: string;
   planFromNow: boolean;
   goblinGemsPerDay: number;
-  goldPass: { enabled: boolean; steps: { from: string; reduction: number }[] };
+  goldPass: { enabled: boolean } & GoldPass;
 }
 
 export const CURRENCIES = [
@@ -32,7 +33,7 @@ export function defaultSettings(meta: Meta): Settings {
     eventEnd: meta.defaults.event.end,
     planFromNow: false,
     goblinGemsPerDay: meta.defaults.goblinGemsPerDay ?? 40,
-    goldPass: { enabled: true, steps: meta.defaults.goldPass },
+    goldPass: { enabled: meta.defaults.goldPass != null, ...meta.defaults.goldPass! },
   };
 }
 
@@ -48,7 +49,7 @@ export function toConfig(s: Settings, meta: Meta) {
     event: { ...meta.defaults.event, end: s.eventEnd },
     planStart: s.planFromNow ? new Date().toISOString() : undefined,
     goblinGemsPerDay: s.goblinGemsPerDay,
-    goldPass: s.goldPass.enabled ? s.goldPass.steps : [],
+    goldPass: s.goldPass.enabled ? (({ enabled, ...gp }) => gp)(s.goldPass) : null,
   };
 }
 
@@ -58,6 +59,8 @@ const KEY = "hj-planner:v1";
 export function loadStored(): { settings?: Partial<Settings>; village?: unknown } {
   try {
     const stored = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    // Older versions stored Gold Pass tiers as fixed dates; fall back to the points-based defaults.
+    if (stored.settings?.goldPass && !("pointsAsOf" in stored.settings.goldPass)) delete stored.settings.goldPass;
     // Older versions stored the name filter as a comma-separated string.
     if (typeof stored.settings?.excludeNames === "string")
       stored.settings.excludeNames = stored.settings.excludeNames

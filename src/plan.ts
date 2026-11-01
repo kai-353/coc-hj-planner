@@ -2,6 +2,7 @@
 // can be started before the event ends (or the budget runs out).
 
 import { type Catalog, type ItemClass, type Queue, WALL_ID } from "./catalog";
+import { boostAt, boostSteps } from "./goldpass";
 import { type Config, type Currency, ITEM_KEYS, type ItemKey } from "./config";
 import { type Alloc, type SimConfig, type SimResult, simulate, type Token } from "./sim";
 import { buildTasks, type Task, type TaskSet } from "./tasks";
@@ -86,10 +87,12 @@ export function makePlan(config: Config, village: Village, catalog: Catalog): Pl
     elapsedMin: Math.max(0, start - exportAt),
   });
 
-  const steps = config.goldPass
-    .map((s) => ({ from: parseIso(s.from), reduction: s.reduction }))
-    .sort((a, b) => a.from - b.from);
-  const goldPassAt = (t: number) => steps.findLast((s) => s.from <= t)?.reduction ?? 0;
+  const goldPass = config.goldPass;
+  const reductionFor = (q: PlanQueue) => {
+    if (!goldPass) return undefined;
+    const steps = boostSteps(goldPass, q === "builder" ? "builder" : "research");
+    return (t: number) => boostAt(steps, t);
+  };
 
   const helperFor = (q: PlanQueue) => {
     const h = q === "builder" ? village.apprentice : q === "lab" ? village.labAssistant : undefined;
@@ -114,7 +117,7 @@ export function makePlan(config: Config, village: Village, catalog: Catalog): Pl
         tasks: taskSet.tasks.filter((t) => t.queue === q),
         potionMultiplier: q === "builder" ? 10 : 24,
         helper: helperFor(q),
-        reductionAt: goldPassAt,
+        reductionAt: reductionFor(q),
         goblin:
           config.goblinGemsPerDay == null
             ? undefined
