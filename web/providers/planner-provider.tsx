@@ -15,7 +15,9 @@ interface PlannerState {
   update: Update;
   village: unknown;
   summary: VillageSummary | undefined;
-  loadFile: (file: File) => Promise<void>;
+  loadFile: (file: File) => Promise<boolean>;
+  /** Load an export from text (pasted or read from the clipboard). Resolves to whether it worked. */
+  loadText: (text: string) => Promise<boolean>;
   plan: PlanView | undefined;
   isPlanning: boolean;
   error: string | null;
@@ -74,22 +76,42 @@ function PlannerProvider({ children }: { children: ReactNode }) {
   const summary = useVillageSummary(village);
   const plan = usePlan(summary.isSuccess ? village : null, config);
 
-  const loadFile = async (file: File) => {
+  const loadText = async (text: string) => {
     let raw: unknown;
     try {
-      raw = JSON.parse(await file.text());
+      raw = JSON.parse(text.trim());
     } catch {
-      setFileError("That file isn't valid JSON.");
-      return;
+      setFileError("That isn't valid JSON. Make sure the whole export was copied.");
+      return false;
     }
     try {
       await client.fetchQuery(villageQuery(raw));
       setVillage(raw);
       setFileError(null);
+      return true;
     } catch (e) {
       setFileError(`Couldn't read that export: ${(e as Error).message}`);
+      return false;
     }
   };
+
+  const loadFile = async (file: File) => loadText(await file.text());
+
+  // Pasting an export anywhere on the page (outside form fields) loads it.
+  const loadTextRef = useRef(loadText);
+  loadTextRef.current = loadText;
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, [contenteditable]")) return;
+      const text = e.clipboardData?.getData("text") ?? "";
+      if (!text.trim().startsWith("{")) return;
+      e.preventDefault();
+      void loadTextRef.current(text);
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, []);
 
   const error =
     fileError ??
@@ -107,6 +129,7 @@ function PlannerProvider({ children }: { children: ReactNode }) {
         village,
         summary: summary.data,
         loadFile,
+        loadText,
         plan: plan.data,
         isPlanning: plan.isFetching,
         error,

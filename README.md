@@ -14,10 +14,15 @@ bun install
 bun run dev        # http://localhost:3000 with hot reload (bun start for production)
 ```
 
-Load your village export, fill in your inventory and tick what to skip; the plan updates as you go
+Load your village export (on mobile the in-game Data Export copies it to the clipboard: tap **Paste from
+clipboard**, or long-press the paste box and choose Paste; pasting anywhere on the page or dropping a
+.json file works too), fill in your inventory and tick what to skip; the plan updates as you go
 (typed fields wait until you pause). Search to skip specific buildings, troops or spells by name.
 Settings and the last export are remembered in the browser. The schedule dims past actions and can jump to the
 next one, so you can keep it open during the event.
+
+To use it from your phone, open `http://<computer's LAN IP>:3000`. Browsers only allow reading the
+clipboard directly over HTTPS or localhost, so over the LAN the button points you to the paste box.
 
 The UI lives in `web/` (React + Tailwind + shadcn/ui, add components with
 `bunx --bun shadcn@latest add <name>`). `src/server.ts` serves it with a small JSON API:

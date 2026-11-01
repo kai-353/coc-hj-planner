@@ -1,4 +1,4 @@
-import { ChevronsUpDown, FileJson, Lock, LockOpen, Upload, X } from "lucide-react";
+import { ChevronsUpDown, ClipboardPaste, FileJson, Lock, LockOpen, Upload, X } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import { CurrencyIcon } from "@/lib/images";
 import { tierUnlock } from "../../src/goldpass";
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import type { VillageSummary } from "@/lib/api";
 import { CATEGORY_LABEL, CURRENCIES } from "@/lib/settings";
 import { usePlanner, useReadyPlanner } from "@/providers/planner-provider";
@@ -20,17 +21,66 @@ import { cn } from "@/lib/utils";
 
 
 export function VillageCard() {
-  const { summary, loadFile: onFile } = usePlanner();
+  const { summary, loadFile: onFile, loadText } = usePlanner();
   const input = useRef<HTMLInputElement>(null);
+  const pasteBox = useRef<HTMLTextAreaElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [pasted, setPasted] = useState("");
+  const [hint, setHint] = useState<string | null>(null);
+
+  const fromText = async (text: string) => {
+    setHint(null);
+    if (await loadText(text)) setPasted("");
+  };
+
+  // Reading the clipboard needs HTTPS or localhost; elsewhere (e.g. a phone on the LAN) fall back
+  // to the paste box, where a long-press → Paste always works.
+  const pasteFromClipboard = async () => {
+    if (window.isSecureContext && navigator.clipboard?.readText) {
+      try {
+        await fromText(await navigator.clipboard.readText());
+        return;
+      } catch {
+        // Permission denied or empty clipboard: use the paste box instead.
+      }
+    }
+    setHint("Long-press the box below and choose Paste.");
+    pasteBox.current?.focus();
+  };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Village</CardTitle>
-        <CardDescription>In game: Settings → More Settings → Data Export, then drop the JSON here.</CardDescription>
+        <CardDescription>
+          In game: Settings → More Settings → Data Export. Paste the copied data, or drop an exported file.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <Button className="w-full" onClick={pasteFromClipboard}>
+          <ClipboardPaste />
+          Paste from clipboard
+        </Button>
+        <div className="space-y-1.5">
+          <Textarea
+            ref={pasteBox}
+            aria-label="Paste village export"
+            rows={2}
+            placeholder="…or paste the export here"
+            className="min-h-0 resize-none font-mono text-xs"
+            value={pasted}
+            onPaste={(e) => {
+              e.preventDefault();
+              void fromText(e.clipboardData.getData("text"));
+            }}
+            // Some mobile keyboards insert clipboard text without a paste event.
+            onChange={(e) => {
+              setPasted(e.target.value);
+              if (e.target.value.trim().endsWith("}")) void fromText(e.target.value);
+            }}
+          />
+          {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+        </div>
         <button
           type="button"
           onClick={() => input.current?.click()}
@@ -46,12 +96,12 @@ export function VillageCard() {
             if (file) onFile(file);
           }}
           className={cn(
-            "flex w-full flex-col items-center gap-2 rounded-lg border border-dashed p-6 text-sm text-muted-foreground transition-colors hover:bg-muted/50",
+            "flex w-full flex-col items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground transition-colors hover:bg-muted/50",
             dragging && "border-primary bg-muted",
           )}
         >
           <Upload className="size-5" />
-          {summary ? "Replace export" : "Choose or drop village export (.json)"}
+          {summary ? "Replace with a file" : "Choose or drop an export file (.json)"}
         </button>
         <input
           ref={input}
