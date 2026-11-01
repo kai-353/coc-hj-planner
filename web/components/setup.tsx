@@ -11,20 +11,14 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import type { Meta, VillageSummary } from "@/lib/api";
-import { CATEGORY_LABEL, CURRENCIES, type Settings } from "@/lib/settings";
+import type { VillageSummary } from "@/lib/api";
+import { CATEGORY_LABEL, CURRENCIES } from "@/lib/settings";
+import { usePlanner, useReadyPlanner } from "@/providers/planner-provider";
 import { cn } from "@/lib/utils";
 
-/** `debounce` marks typed input, so the plan waits until the user pauses. */
-type Update = (patch: Partial<Settings>, opts?: { debounce?: boolean }) => void;
 
-export function VillageCard({
-  summary,
-  onFile,
-}: {
-  summary: VillageSummary | null;
-  onFile: (file: File) => void;
-}) {
+export function VillageCard() {
+  const { summary, loadFile: onFile } = usePlanner();
   const input = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -107,7 +101,8 @@ function NumberField({ id, label, value, onChange }: { id: string; label: string
   );
 }
 
-export function InventoryCard({ meta, settings, update }: { meta: Meta; settings: Settings; update: Update }) {
+export function InventoryCard() {
+  const { meta, settings, update } = useReadyPlanner();
   const setCount = (key: string, n: number) =>
     update({ inventory: { ...settings.inventory, [key]: n } }, { debounce: true });
   const potions = meta.items.filter((i) => i.kind === "potion");
@@ -177,17 +172,8 @@ export function InventoryCard({ meta, settings, update }: { meta: Meta; settings
   );
 }
 
-export function ExclusionsCard({
-  meta,
-  summary,
-  settings,
-  update,
-}: {
-  meta: Meta;
-  summary: VillageSummary | null;
-  settings: Settings;
-  update: Update;
-}) {
+export function ExclusionsCard() {
+  const { meta, summary, settings, update } = useReadyPlanner();
   const stats = new Map(summary?.categories.map((c) => [c.category, c]));
   const toggle = (c: string, on: boolean) =>
     update({
@@ -239,7 +225,8 @@ const toLocalInput = (iso: string) => {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 };
 
-export function SettingsCard({ settings, update }: { settings: Settings; update: Update }) {
+export function SettingsCard() {
+  const { settings, update } = useReadyPlanner();
   return (
     <Card>
       <CardHeader>

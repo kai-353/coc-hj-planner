@@ -8,11 +8,14 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { AppProviders } from "./providers/planner-provider";
 
 const elem = document.getElementById("root")!;
 const app = (
   <StrictMode>
-    <App />
+    <AppProviders>
+      <App />
+    </AppProviders>
   </StrictMode>
 );
 

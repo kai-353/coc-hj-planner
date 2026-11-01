@@ -8,6 +8,9 @@ Runtime is **Bun** (Node is not installed): `bun run dev` (web app), `bun run pl
   Markdown report and the UI render. `src/server.ts` is the Bun.serve web server + API.
 - `web/` is the React + shadcn/ui frontend (`@/*` → `web/*`). It may import *types* from `src/`, and
   runtime code only from browser-safe modules (e.g. `src/time.ts`).
+- Frontend state lives in `web/providers/planner-provider.tsx` (`usePlanner()` / `useReadyPlanner()`):
+  settings, uploaded village, debouncing, localStorage. All API calls go through TanStack Query hooks
+  in `web/lib/queries.ts`; `App.tsx` is layout only. Don't add API state to components.
 - Adding shadcn components: `bunx --bun shadcn@latest add <name>`. The CLI has written
   `import { cn } from "cn"` before; fix it to `@/lib/utils`.
 - Commit regularly in small steps.
