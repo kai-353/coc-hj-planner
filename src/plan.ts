@@ -97,6 +97,14 @@ export function makePlan(config: Config, village: Village, catalog: Catalog): Pl
     return (t: number) => boostAt(steps, t);
   };
 
+  /** When the strongest Gold Pass boost for a queue becomes active. */
+  const bestBoostFrom = (q: PlanQueue) => {
+    if (!goldPass) return undefined;
+    const steps = boostSteps(goldPass, q === "builder" ? "builder" : "research");
+    const best = Math.max(...steps.map((s) => s.reduction));
+    return Math.max(start, steps.find((s) => s.reduction === best)!.from);
+  };
+
   const helperFor = (q: PlanQueue) => {
     const h = q === "builder" ? village.apprentice : q === "lab" ? village.labAssistant : undefined;
     if (!h || h.level <= 0) return undefined;
@@ -122,6 +130,8 @@ export function makePlan(config: Config, village: Village, catalog: Catalog): Pl
         potionMultiplier: q === "builder" ? 10 : 24,
         helper: helperFor(q),
         reductionAt: reductionFor(q),
+        potionPacingFrom: config.potionPacing === "even" ? undefined : bestBoostFrom(q),
+        noPotionsBefore: config.potionPacing === "strict",
         goblin:
           config.goblinGemsPerDay == null
             ? undefined

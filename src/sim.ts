@@ -64,6 +64,10 @@ export interface SimConfig {
   /** Completion times of tasks in other queues (for cross-queue prerequisites). */
   externalDone?: Map<string, number>;
   potionMultiplier: number;
+  /** Spread potions that aren't needed for timing from this time on instead of from the start. */
+  potionPacingFrom?: number;
+  /** When true, no potions at all before `potionPacingFrom`, not even ones that save idle time. */
+  noPotionsBefore?: boolean;
   /** Extra time reduction (0–1) for upgrades started at t, e.g. the Gold Pass builder/research boost. */
   reductionAt?: (t: number) => number;
   helper?: Helper;
@@ -289,13 +293,15 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
     if (ready > 0 && t >= potionUntil && t < lastAction && busy.length) {
       const boostable = slots.filter((s) => !s.temp && (s.task || !s.goblin)).length;
       const used = alloc.potions.length - potionQueue.length;
-      const due = Math.ceil((alloc.potions.length * (t - start)) / (lastAction - start)) - used;
+      const paceFrom = Math.min(Math.max(start, cfg.potionPacingFrom ?? start), lastAction - 1);
+      const due =
+        t < paceFrom ? 0 : Math.ceil((alloc.potions.length * (t - paceFrom)) / (lastAction - paceFrom)) - used;
       const finalDay = lastAction - t < DAY;
       let best: { k: number; per: number } | undefined;
       for (let k = 1; k <= Math.min(ready, MAX_BATCH); k++) {
         const v = batchValue(t, k, busy, boostable);
         const ok =
-          (v.idleSaved > 0 && v.efficiency >= 0.6) ||
+          (v.idleSaved > 0 && v.efficiency >= 0.6 && !(cfg.noPotionsBefore && t < paceFrom)) ||
           (v.idleSaved >= 0 && k <= Math.max(due, finalDay ? ready : 0) && v.efficiency >= (finalDay ? 0.5 : 0.85));
         if (ok && (!best || v.efficiency > best.per + 1e-9)) best = { k, per: v.efficiency };
       }

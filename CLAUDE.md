@@ -82,6 +82,9 @@ Runtime is **Bun** (Node is not installed): `bun run dev` (web app), `bun run pl
   points. Builder tier thresholds (10/640/1060) are still unconfirmed placeholders.
   Progress is valued in full-price minutes, so boosting more-discounted upgrades counts for more.
 - The user prefers using potions sooner rather than later (even pacing over the event).
+- Potions drunk before the 15%/20% Gold Pass tiers are timing potions (they keep builders/lab busy
+  by avoiding overnight idle). Holding them until the best tier (`potionPacing: "strict"`) was
+  measured to cost more (2026 export: +10 research potions, +230 League Medals, +15 h idle).
 - Owned items are always used before buying the same item.
 
 Assumptions in the model that are worth verifying in game: potions also speed up the goblin's upgrade;
