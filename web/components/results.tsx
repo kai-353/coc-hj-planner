@@ -421,7 +421,7 @@ function Resources({ plan }: { plan: PlanView }) {
       <Card>
         <CardHeader>
           <CardTitle>Resources needed</CardTitle>
-          <CardDescription>What the scheduled upgrades cost: Hammer Jam price minus the Gold Pass boost active when each one starts. Walls are listed separately.</CardDescription>
+          <CardDescription>What the scheduled upgrades cost: Hammer Jam price minus the Gold Pass boost active when each one starts.</CardDescription>
         </CardHeader>
         <CardContent>
           {plan.resources.length ? (
@@ -452,17 +452,22 @@ function Resources({ plan }: { plan: PlanView }) {
           {plan.walls.length ? (
             <ul className="space-y-2 text-sm">
               {plan.walls.map((w) => (
-                <li key={w.level} className="flex justify-between gap-4">
-                  <span>
-                    {w.count}× level {w.level} → {w.maxLevel}
-                  </span>
-                  <span className="text-right">
-                    <span className="font-medium tabular-nums">{fmtNum(w.count * w.costEach)}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {w.resource} · {fmtNum(w.costEach)} each
-                      {w.goldPassReduction > 0 && ` · with ${Math.round(w.goldPassReduction * 100)}% Gold Pass boost`}
+                <li key={w.level} className="space-y-0.5">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="whitespace-nowrap">
+                      {w.count}× level {w.level} → {w.maxLevel}
                     </span>
-                  </span>
+                    <span className="flex items-center gap-1.5 font-medium tabular-nums">
+                      {wallResourceImages(w.resource).map((src) => (
+                        <img key={src} src={src} alt="" className="size-5 object-contain" />
+                      ))}
+                      {fmtNum(w.count * w.costEach)}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {w.resource} · {fmtNum(w.costEach)} each
+                    {w.goldPassReduction > 0 && ` · with ${Math.round(w.goldPassReduction * 100)}% Gold Pass boost`}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -474,6 +479,13 @@ function Resources({ plan }: { plan: PlanView }) {
     </div>
   );
 }
+
+/** "Gold or Elixir" → both pictures; a single resource → its own. */
+const wallResourceImages = (resource: string) =>
+  resource
+    .split(" or ")
+    .map((r) => RESOURCE_IMAGE[r])
+    .filter((src): src is string => !!src);
 
 function Skipped({ plan }: { plan: PlanView }) {
   if (!plan.skipped.length) return <Empty>Nothing skipped.</Empty>;
