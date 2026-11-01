@@ -1,9 +1,10 @@
 import { CalendarClock, Loader2, Moon, Sun } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Results } from "@/components/results";
 import { ExclusionsCard, InventoryCard, SettingsCard, VillageCard } from "@/components/setup";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { createPlan, getMeta, type Meta, type PlanView, summarizeVillage, type VillageSummary } from "@/lib/api";
 import { defaultSettings, loadStored, type Settings, store, toConfig } from "@/lib/settings";
 import "./index.css";
@@ -60,20 +61,35 @@ export function App() {
     }
   };
 
-  const run = async () => {
+  // Re-plan whenever the inputs change: right away for toggles, after a pause for typed fields.
+  // Only the latest request may update the screen.
+  const delay = useRef(0);
+  const latest = useRef(0);
+  useEffect(() => {
     if (!meta || !settings || !village) return;
-    setBusy(true);
-    setError(null);
-    try {
-      setPlan(await createPlan(village, toConfig(settings, meta)));
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
+    const id = ++latest.current;
+    const timer = setTimeout(async () => {
+      setBusy(true);
+      try {
+        const next = await createPlan(village, toConfig(settings, meta));
+        if (id === latest.current) {
+          setPlan(next);
+          setError(null);
+        }
+      } catch (e) {
+        if (id === latest.current) setError((e as Error).message);
+      } finally {
+        if (id === latest.current) setBusy(false);
+      }
+    }, delay.current);
+    delay.current = 0;
+    return () => clearTimeout(timer);
+  }, [meta, settings, village]);
 
-  const update = (patch: Partial<Settings>) => setSettings((s) => (s ? { ...s, ...patch } : s));
+  const update = (patch: Partial<Settings>, opts?: { debounce?: boolean }) => {
+    delay.current = opts?.debounce ? 700 : 0;
+    setSettings((s) => (s ? { ...s, ...patch } : s));
+  };
 
   return (
     <div className="min-h-screen">
@@ -97,10 +113,6 @@ export function App() {
               <InventoryCard meta={meta} settings={settings} update={update} />
               <ExclusionsCard meta={meta} summary={summary} settings={settings} update={update} />
               <SettingsCard settings={settings} update={update} />
-              <Button className="w-full" size="lg" disabled={!village || busy} onClick={run}>
-                {busy && <Loader2 className="animate-spin" />}
-                {busy ? "Planning…" : plan ? "Re-plan" : "Generate plan"}
-              </Button>
             </>
           ) : (
             !error && <Loader2 className="mx-auto size-6 animate-spin text-muted-foreground" />
@@ -108,6 +120,12 @@ export function App() {
         </aside>
 
         <section className="min-w-0 space-y-4">
+          {busy && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+              <Loader2 className="size-4 animate-spin" />
+              Updating plan…
+            </div>
+          )}
           {error && (
             <Alert variant="destructive">
               <AlertTitle>Something went wrong</AlertTitle>
@@ -115,14 +133,16 @@ export function App() {
             </Alert>
           )}
           {plan ? (
-            <Results plan={plan} />
+            <div className={cn("transition-opacity", busy && "opacity-60")}>
+              <Results plan={plan} />
+            </div>
           ) : (
             <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2 rounded-xl border border-dashed p-8 text-center">
               <CalendarClock className="size-8 text-muted-foreground" />
               <p className="font-medium">No plan yet</p>
               <p className="max-w-sm text-sm text-muted-foreground">
                 {village
-                  ? "Fill in your inventory, choose what to skip and hit Generate plan."
+                  ? "Working out your plan…"
                   : "Start by loading your village export on the left."}
               </p>
             </div>

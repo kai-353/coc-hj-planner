@@ -29,6 +29,8 @@ export interface VillageSummary {
   apprenticeLevel: number;
   labAssistantLevel: number;
   categories: { category: string; upgrades: number; durMin: number }[];
+  /** Everything with upgrades left, for the "skip by name" suggestions. */
+  names: { name: string; category: string; upgrades: number; durMin: number }[];
 }
 
 const badRequest = (e: unknown) =>
@@ -59,8 +61,13 @@ const server = serve({
             elapsedMin: 0,
           });
           const byCategory = new Map<string, { upgrades: number; durMin: number }>();
+          const byName = new Map<string, VillageSummary["names"][number]>();
           for (const t of tasks) {
             if (t.ongoing) continue;
+            const n = byName.get(t.name) ?? { name: t.name, category: t.category, upgrades: 0, durMin: 0 };
+            n.upgrades++;
+            n.durMin += t.durMin;
+            byName.set(t.name, n);
             const key = t.supercharge ? "supercharges" : t.category;
             const c = byCategory.get(key) ?? { upgrades: 0, durMin: 0 };
             c.upgrades++;
@@ -75,6 +82,7 @@ const server = serve({
             apprenticeLevel: village.apprentice?.level ?? 0,
             labAssistantLevel: village.labAssistant?.level ?? 0,
             categories: [...byCategory].map(([category, c]) => ({ category, ...c })),
+            names: [...byName.values()].sort((a, b) => a.name.localeCompare(b.name)),
           } satisfies VillageSummary);
         } catch (e) {
           return badRequest(e);

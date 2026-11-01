@@ -14,8 +14,9 @@ bun install
 bun run dev        # http://localhost:3000 with hot reload (bun start for production)
 ```
 
-Load your village export, fill in your inventory, tick what to skip and hit **Generate plan**. Settings
-and the last export are remembered in the browser. The schedule dims past actions and can jump to the
+Load your village export, fill in your inventory and tick what to skip; the plan updates as you go
+(typed fields wait until you pause). Search to skip specific buildings, troops or spells by name.
+Settings and the last export are remembered in the browser. The schedule dims past actions and can jump to the
 next one, so you can keep it open during the event.
 
 The UI lives in `web/` (React + Tailwind + shadcn/ui, add components with

@@ -6,7 +6,7 @@ export interface Settings {
   /** Books/hammers the user unlocked (everything else in the default `neverUse` stays saved). */
   allowedItems: string[];
   excludeCategories: string[];
-  excludeNames: string;
+  excludeNames: string[];
   awakeFrom: string;
   awakeTo: string;
   eventEnd: string;
@@ -25,7 +25,7 @@ export function defaultSettings(meta: Meta): Settings {
     inventory: {},
     allowedItems: [],
     excludeCategories: ["siege-machines", "supercharges", "guardians"],
-    excludeNames: "",
+    excludeNames: [],
     awakeFrom: meta.defaults.awake.from,
     awakeTo: meta.defaults.awake.to,
     eventEnd: meta.defaults.event.end,
@@ -40,10 +40,7 @@ export function toConfig(s: Settings, meta: Meta) {
     neverUse: meta.defaults.neverUse.filter((k) => !s.allowedItems.includes(k)),
     exclude: {
       categories: s.excludeCategories,
-      names: s.excludeNames
-        .split(",")
-        .map((n) => n.trim())
-        .filter(Boolean),
+      names: s.excludeNames,
     },
     awake: { from: s.awakeFrom, to: s.awakeTo },
     event: { ...meta.defaults.event, end: s.eventEnd },
@@ -57,7 +54,14 @@ const KEY = "hj-planner:v1";
 
 export function loadStored(): { settings?: Partial<Settings>; village?: unknown } {
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    const stored = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    // Older versions stored the name filter as a comma-separated string.
+    if (typeof stored.settings?.excludeNames === "string")
+      stored.settings.excludeNames = stored.settings.excludeNames
+        .split(",")
+        .map((n: string) => n.trim())
+        .filter(Boolean);
+    return stored;
   } catch {
     return {};
   }
