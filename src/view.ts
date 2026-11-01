@@ -245,10 +245,17 @@ export function buildPlanView(plan: Plan): PlanView {
 
   const timeline = buildTimeline(plan);
 
+  // What the scheduled starts cost: event price, minus the Gold Pass boost active when each one starts
+  // (the Builder/Research Boost lowers resources as well as time).
   const resources = new Map<string, number>();
-  for (const q of QUEUES)
-    for (const t of plan.simConfigs[q].tasks)
-      if (results[q].startedAt.has(t.id) && t.cost) resources.set(t.resource, (resources.get(t.resource) ?? 0) + t.cost);
+  for (const q of QUEUES) {
+    const boostAt = plan.simConfigs[q].reductionAt ?? (() => 0);
+    for (const t of plan.simConfigs[q].tasks) {
+      const startedAt = results[q].startedAt.get(t.id);
+      if (startedAt == null || !t.cost) continue;
+      resources.set(t.resource, (resources.get(t.resource) ?? 0) + Math.round(t.cost * (1 - boostAt(startedAt))));
+    }
+  }
 
   return {
     tag: village.tag,

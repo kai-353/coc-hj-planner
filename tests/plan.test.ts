@@ -3,6 +3,7 @@ import { Catalog } from "../src/catalog";
 import { DEFAULTS } from "../src/config";
 import { makePlan, QUEUES } from "../src/plan";
 import { buildTasks } from "../src/tasks";
+import { buildPlanView } from "../src/view";
 import { boostAt, boostSteps, tierUnlock } from "../src/goldpass";
 import { Clock, parseIso } from "../src/time";
 import { parseVillage } from "../src/village";
@@ -171,6 +172,20 @@ describe("shop limits and potions", () => {
     expect(tierUnlock(gp, 551)).toBe(parseIso("2026-11-03T08:00:00Z"));
     // Before the day's reset, that same day's reset is the next one.
     expect(tierUnlock({ ...gp, pointsAsOf: "2026-11-02T07:00:00Z" }, 441)).toBe(parseIso("2026-11-02T08:00:00Z"));
+  });
+
+  test("resource totals apply the Gold Pass boost active at each start", () => {
+    const expected = new Map<string, number>();
+    for (const q of QUEUES) {
+      const steps = boostSteps(DEFAULTS.goldPass!, q === "builder" ? "builder" : "research");
+      for (const t of plan.simConfigs[q].tasks) {
+        const at = plan.results[q].startedAt.get(t.id);
+        if (at == null || !t.cost) continue;
+        expected.set(t.resource, (expected.get(t.resource) ?? 0) + Math.round(t.cost * (1 - boostAt(steps, at))));
+      }
+    }
+    const view = buildPlanView(plan);
+    expect(Object.fromEntries(view.resources.map((r) => [r.resource, r.amount]))).toEqual(Object.fromEntries(expected));
   });
 
   test("owned items are used before buying the same item", () => {

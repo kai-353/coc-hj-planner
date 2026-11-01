@@ -102,7 +102,7 @@ export function renderMarkdown(v: PlanView): string {
   }
 
   if (v.resources.length) {
-    line(`## Resources needed (discounted, walls not included)`);
+    line(`## Resources needed (Hammer Jam and Gold Pass discounts at each start; walls not included)`);
     line();
     for (const r of v.resources) line(`- ${r.resource}: ${fmtNum(r.amount)}`);
     line();

@@ -421,7 +421,7 @@ function Resources({ plan }: { plan: PlanView }) {
       <Card>
         <CardHeader>
           <CardTitle>Resources needed</CardTitle>
-          <CardDescription>Discounted cost of everything that starts (walls are listed separately)</CardDescription>
+          <CardDescription>What the scheduled upgrades cost: Hammer Jam price minus the Gold Pass boost active when each one starts. Walls are listed separately.</CardDescription>
         </CardHeader>
         <CardContent>
           {plan.resources.length ? (
