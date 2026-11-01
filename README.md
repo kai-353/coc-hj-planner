@@ -7,10 +7,24 @@ as much as possible is *started* before the event ends, with as few special item
 Game data (levels, times, costs, TH requirements) comes from the
 [`clash-of-clans-data`](https://www.npmjs.com/package/clash-of-clans-data) package.
 
-## Usage
+## Web app
 
 ```bash
 bun install
+bun run dev        # http://localhost:3000 with hot reload (bun start for production)
+```
+
+Load your village export, fill in your inventory, tick what to skip and hit **Generate plan**. Settings
+and the last export are remembered in the browser. The schedule dims past actions and can jump to the
+next one, so you can keep it open during the event.
+
+The UI lives in `web/` (React + Tailwind + shadcn/ui, add components with
+`bunx --bun shadcn@latest add <name>`). `src/server.ts` serves it with a small JSON API:
+`GET /api/meta`, `POST /api/village` and `POST /api/plan` (returns the `PlanView` from `src/view.ts`).
+
+## CLI
+
+```bash
 bun run plan                       # reads planner.config.json, writes plan.md
 bun run plan -c other.json -o out.md
 bun run plan --remaining           # list what's left to upgrade and exit

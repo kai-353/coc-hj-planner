@@ -1,12 +1,21 @@
 # coc-hj-planner
 
 Hammer Jam upgrade scheduler for Clash of Clans (see README.md for usage and architecture).
-Runtime is **Bun** (Node is not installed): `bun run plan`, `bun test`, `bunx tsc --noEmit -p .`.
+Runtime is **Bun** (Node is not installed): `bun run dev` (web app), `bun run plan` (CLI), `bun test`,
+`bunx tsc --noEmit -p .`.
+
+- `src/` is the planner (Bun-only APIs; runs on the server). `src/view.ts` is the JSON view both the
+  Markdown report and the UI render. `src/server.ts` is the Bun.serve web server + API.
+- `web/` is the React + shadcn/ui frontend (`@/*` → `web/*`). It may import *types* from `src/`, and
+  runtime code only from browser-safe modules (e.g. `src/time.ts`).
+- Adding shadcn components: `bunx --bun shadcn@latest add <name>`. The CLI has written
+  `import { cn } from "cn"` before; fix it to `@/lib/utils`.
+- Commit regularly in small steps.
 
 ## User goals and preferences
 
 - Max the base during Hammer Jam while spending as few special items as possible.
-- Builders, lab and pet house should never sit idle: upgrades should finish between **09:00 and 23:00
+- Builders and the lab should never sit idle: upgrades should finish between **09:00 and 23:00
   Europe/Amsterdam**, and every action (start, potion, helper) happens inside that window.
 - **Books and hammers are saved for the TH19 release.** Never use them by default (`neverUse`).
 - **Gems are not for finishing upgrades.** They are only for the Goblin Builder / Goblin Researcher.
