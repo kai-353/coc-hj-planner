@@ -200,4 +200,27 @@ describe("free-by with potions still to come", () => {
       expect(plan.results[q].lateMin).toBe(0);
     }
   });
+
+  test("potions arriving after the free-by time don't count toward finishing in time (free by 8 Nov)", async () => {
+    const later = parseVillage(await Bun.file(`${import.meta.dir}/../base_export_26-11-01-2.json`).json(), catalog);
+    const plan = makePlan(
+      {
+        ...DEFAULTS,
+        village: "",
+        freeBy: "2026-11-08T08:00:00Z",
+        inventory: { builderPotion: 4, researchPotion: 1, gems: 5751, leagueMedals: 2345, raidMedals: 3356 },
+        exclude: {
+          categories: ["siege-machines", "supercharges", "guardians"],
+          names: ["Clone Spell", "Recall Spell", "Earthquake Spell", "Bat Spell"],
+        },
+      },
+      later,
+      catalog,
+    );
+    for (const q of QUEUES) {
+      expect(plan.results[q].lateMin).toBe(0);
+      for (const t of [...plan.results[q].doneAt.values(), ...plan.results[q].projectedDone.values()])
+        expect(t).toBeLessThanOrEqual(plan.freeBy);
+    }
+  });
 });

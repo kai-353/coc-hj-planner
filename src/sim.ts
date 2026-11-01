@@ -226,10 +226,15 @@ export function simulate(cfg: SimConfig, alloc: Alloc): SimResult {
   };
 
   const choose = (t: number, candidates: Task[], res: Set<Task>): Task | undefined => {
-    // Only upgrades that can finish by the free-by time. Potions still to come count: each one moves
-    // every running upgrade forward, and a late finish forces them to be drunk (see below).
-    const credit = potionQueue.filter((p) => p.availableAt < lastAction).length * (M - 1) * HOUR;
-    const avail = candidates.filter((x) => t + durAt(x, t) - credit <= cfg.freeBy);
+    // Only upgrades that can finish by the free-by time. Potions still to come count, but only those
+    // available before the deadline and not already needed by running upgrades (one potion speeds up
+    // every running upgrade at once, so the running upgrade that needs the most sets that number).
+    // A late finish forces the potions to be drunk (see below).
+    const deadline = Math.min(cfg.freeBy, lastAction);
+    const potionsNeeded = (finish: number) => Math.max(0, Math.ceil((finish - cfg.freeBy) / ((M - 1) * HOUR)));
+    const committed = Math.max(0, ...slots.filter((s) => s.task).map((s) => potionsNeeded(t + s.rem)));
+    const spare = potionQueue.filter((p) => p.availableAt < deadline).length - committed;
+    const avail = candidates.filter((x) => potionsNeeded(t + durAt(x, t)) <= spare);
     if (!avail.length) return undefined;
     // An upgrade only "fits" if the slot frees up while the player can still start the next one.
     const fits = avail.filter((x) => !res.has(x) && t + durAt(x, t) <= lastAction);
