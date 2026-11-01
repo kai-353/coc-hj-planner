@@ -50,7 +50,6 @@ bun test
 | `exclude.categories` | Any of `town-hall`, `defenses`, `traps`, `resources`, `army`, `other`, `guardians`, `heroes`, `troops`, `spells`, `siege-machines`, `supercharges` |
 | `exclude.names` | Names to skip, e.g. `"Gold Storage"` (case, spaces and punctuation are ignored) |
 | `goldPass` | Gold Pass boosts: `points` you have at `pointsAsOf`, max `pointsPerDay`, and `builder` / `research` tiers `[{ "points": 640, "reduction": 0.15 }, …]`. Tiers unlock at the daily reset that brings your maximum points to the threshold. `null` = no Gold Pass |
-| `potionPacing` | `"even"` (default): potions that aren't needed to avoid overnight idle are spread over the event; `"after-best-boost"`: spread them once the best Gold Pass tier is active; `"strict"`: no potions at all before then. On the 2026 export `strict` cost 10 more research potions and 230 more League Medals |
 | `goblinGemsPerDay` | Goblin Builder / Researcher price (40 gems per day of upgrade time); `null` disables them |
 | `value` | Gem-equivalent "price" of each item/currency. The planner minimises the total value spent. |
 | `shop` | What can be bought, where and for how much (League Shop / Raid Medal Trader), with optional `limit`, `limitPerWeek` and `cooldownDays` |

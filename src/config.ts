@@ -50,12 +50,6 @@ export interface Config {
   goblinGemsPerDay: number | null;
   /** Gold Pass builder/research boosts (unlocked by season points); null = no Gold Pass. */
   goldPass: GoldPass | null;
-  /**
-   * When potions that aren't needed for timing get used: "even" spreads them over the whole event,
-   * "after-best-boost" waits until the best Gold Pass tier is active, "strict" also holds back
-   * timing potions until then.
-   */
-  potionPacing: "even" | "after-best-boost" | "strict";
   exclude: { categories: string[]; names: string[] };
   /** How "expensive" each special item is to spend, in gem-equivalents. The planner minimises the total. */
   value: Partial<Record<ItemKey | Currency, number>>;
@@ -83,7 +77,6 @@ export const DEFAULTS: Omit<Config, "village"> = {
     "hammerOfSpells",
   ],
   goblinGemsPerDay: 40,
-  potionPacing: "even",
   // The user's points on 1 Nov (110/day max incl. bonus). Research tiers are confirmed by the user;
   // builder tier thresholds are still PLACEHOLDERS (take them from the in-game Gold Pass screen).
   goldPass: {
