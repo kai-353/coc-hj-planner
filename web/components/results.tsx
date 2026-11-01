@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   FlaskConical,
   FlaskRound,
-  Gem,
   Hammer,
   List,
   Moon,
@@ -15,6 +14,7 @@ import {
 import { useMemo, useRef, useState } from "react";
 import { fmtDuration } from "../../src/time";
 import { TimelineChart } from "@/components/timeline";
+import { CurrencyIcon, RESOURCE_IMAGE } from "@/lib/images";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -130,7 +130,7 @@ function Items({ plan }: { plan: PlanView }) {
             ))}
             {plan.goblins.map((g) => (
               <li key={g.name} className="flex items-center gap-3 rounded-lg border p-3 text-sm">
-                <Gem className="size-4 shrink-0 text-muted-foreground" />
+                <CurrencyIcon currency="gems" className="size-8" />
                 <span className="flex-1">
                   <span className="font-medium">{g.name}</span>
                   <span className="block text-xs text-muted-foreground">
@@ -145,7 +145,8 @@ function Items({ plan }: { plan: PlanView }) {
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-muted-foreground">Total spent</span>
             {plan.spent.map((s) => (
-              <Badge key={s.currency} variant="secondary">
+              <Badge key={s.currency} variant="secondary" className="gap-1.5">
+                <CurrencyIcon currency={s.currency} className="size-4" />
                 {fmtNum(s.amount)} {s.label}
               </Badge>
             ))}
@@ -187,9 +188,9 @@ function Items({ plan }: { plan: PlanView }) {
   );
 }
 
-type Filter = "all" | "builder" | "lab" | "items";
+type Filter = "all" | "builder" | "lab" | "items" | "assistants";
 
-const isItemRow = (r: ScheduleRow) => r.kind === "potion" || r.kind === "helper" || r.kind === "book" || r.kind === "hammer";
+const isItemRow = (r: ScheduleRow) => r.kind === "potion" || r.kind === "book" || r.kind === "hammer";
 
 function Schedule({ plan }: { plan: PlanView }) {
   const [filter, setFilter] = useState<Filter>("all");
@@ -203,7 +204,13 @@ function Schedule({ plan }: { plan: PlanView }) {
         .map((d) => ({
           ...d,
           rows: d.rows.filter((r) =>
-            filter === "all" ? true : filter === "items" ? isItemRow(r) : r.queue === filter,
+            filter === "all"
+              ? true
+              : filter === "items"
+                ? isItemRow(r)
+                : filter === "assistants"
+                  ? r.kind === "helper"
+                  : r.queue === filter,
           ),
         }))
         .filter((d) => d.rows.length),
@@ -231,7 +238,7 @@ function Schedule({ plan }: { plan: PlanView }) {
         <ToggleGroup
           type="single"
           variant="outline"
-          value={mode === "timeline" && filter === "items" ? "all" : filter}
+          value={mode === "timeline" && (filter === "items" || filter === "assistants") ? "all" : filter}
           onValueChange={(v) => v && setFilter(v as Filter)}
           aria-label="Show"
         >
@@ -239,6 +246,7 @@ function Schedule({ plan }: { plan: PlanView }) {
           <ToggleGroupItem value="builder">Builders</ToggleGroupItem>
           <ToggleGroupItem value="lab">Lab</ToggleGroupItem>
           {mode === "list" && <ToggleGroupItem value="items">Items</ToggleGroupItem>}
+          {mode === "list" && <ToggleGroupItem value="assistants">Assistants</ToggleGroupItem>}
         </ToggleGroup>
         {mode === "list" && currentDay && (
           <Button
@@ -331,7 +339,13 @@ function Row({ row: r, past }: { row: ScheduleRow; past: boolean }) {
             </div>
             <div className="text-xs text-muted-foreground">
               {fmtDuration(r.durMin)}
-              {r.gems > 0 && ` · ${fmtNum(r.gems)} gems`} · done {r.doneAt ?? "?"}
+              {r.gems > 0 && (
+                <>
+                  {" · "}
+                  <CurrencyIcon currency="gems" className="inline size-3.5 align-[-2px]" /> {fmtNum(r.gems)} gems
+                </>
+              )}{" "}
+              · done {r.doneAt ?? "?"}
             </div>
           </>
         )}
@@ -414,7 +428,12 @@ function Resources({ plan }: { plan: PlanView }) {
             <dl className="space-y-2 text-sm">
               {plan.resources.map((r) => (
                 <div key={r.resource} className="flex justify-between">
-                  <dt className="text-muted-foreground">{r.resource}</dt>
+                  <dt className="flex items-center gap-2 text-muted-foreground">
+                    {RESOURCE_IMAGE[r.resource] && (
+                      <img src={RESOURCE_IMAGE[r.resource]} alt="" className="size-5 object-contain" />
+                    )}
+                    {r.resource}
+                  </dt>
                   <dd className="font-medium tabular-nums">{fmtNum(r.amount)}</dd>
                 </div>
               ))}

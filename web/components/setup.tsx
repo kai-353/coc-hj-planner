@@ -1,5 +1,6 @@
 import { ChevronsUpDown, FileJson, Lock, LockOpen, Upload, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
+import { CurrencyIcon } from "@/lib/images";
 import { tierUnlock } from "../../src/goldpass";
 import { fmtDuration } from "../../src/time";
 import { Badge } from "@/components/ui/badge";
@@ -87,12 +88,14 @@ function NumberField({
   id,
   label,
   image,
+  icon,
   value,
   onChange,
 }: {
   id: string;
   label: string;
   image?: string;
+  icon?: ReactNode;
   value: number;
   onChange: (n: number) => void;
 }) {
@@ -100,6 +103,7 @@ function NumberField({
     <div className="space-y-1.5">
       <Label htmlFor={id} className="text-xs text-muted-foreground">
         {image && <img src={image} alt="" className="-my-1 size-5 object-contain" />}
+        {icon}
         {label}
       </Label>
       <Input
@@ -143,7 +147,14 @@ export function InventoryCard() {
             />
           ))}
           {CURRENCIES.map((c) => (
-            <NumberField key={c.key} id={c.key} label={c.label} value={settings.inventory[c.key] ?? 0} onChange={(n) => setCount(c.key, n)} />
+            <NumberField
+              key={c.key}
+              id={c.key}
+              label={c.label}
+              icon={<CurrencyIcon currency={c.key} className="-my-1 size-5" />}
+              value={settings.inventory[c.key] ?? 0}
+              onChange={(n) => setCount(c.key, n)}
+            />
           ))}
         </div>
         <Separator />
